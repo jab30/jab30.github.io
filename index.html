@@ -1,0 +1,1205 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>GCU Baseball Team Analytics</title>
+  <style>
+    :root {
+      --bg: #f4f2f9;
+      --ink: #13101e;
+      --muted: #6b6478;
+      --line: #dcd6ec;
+      --purple: #522398;
+      --purple-2: #2e1260;
+      --purple-light: #7b3dc4;
+      --gold: #d4a017;
+      --gold-light: #f5e484;
+      --surface: #fff;
+      --soft: #ede8f8;
+      --shadow-sm: 0 2px 8px rgba(31,18,60,.07);
+      --shadow: 0 8px 24px rgba(31,18,60,.10);
+      --radius: 10px;
+      --radius-sm: 7px;
+      font-family: "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { max-width:100%; overflow-x:hidden; }
+    body { color:var(--ink); background:var(--bg); }
+    button,input,select { font:inherit; }
+
+    /* ── Layout ── */
+    .shell { max-width:1520px; margin:0 auto; padding:24px 28px; }
+    .shell > * { min-width:0; }
+
+    /* ── Header ── */
+    header {
+      display:flex; align-items:center; gap:14px;
+      padding:18px 0 20px; border-bottom:2px solid var(--purple);
+      margin-bottom:22px;
+    }
+    .brand { display:flex; align-items:center; gap:14px; }
+    .brand-logo {
+      width:72px; height:58px; display:block; object-fit:contain;
+      filter:drop-shadow(0 2px 4px rgba(31,18,60,.16));
+    }
+    h1 { font-size:clamp(30px,3.2vw,48px); line-height:1; color:var(--purple-2); }
+
+    /* ── KPI tiles ── */
+    .kpis {
+      display:grid; grid-template-columns:repeat(6,minmax(0,1fr));
+      gap:10px; margin-bottom:22px;
+    }
+    .tile {
+      background:var(--surface); border:1px solid var(--line);
+      border-radius:var(--radius); padding:14px 16px 12px;
+      box-shadow:var(--shadow-sm);
+    }
+    .tile .label { color:var(--muted); font-size:10.5px; font-weight:700; letter-spacing:.07em; text-transform:uppercase; }
+    .tile .value { font-size:26px; font-weight:860; color:var(--purple-2); margin-top:6px; overflow-wrap:anywhere; }
+    .tile .hint  { color:var(--muted); font-size:11.5px; margin-top:3px; }
+
+    /* ── Main grid ── */
+    .main-grid {
+      display:grid; grid-template-columns:minmax(0,1fr);
+      gap:16px; align-items:start; margin-bottom:20px;
+    }
+    .panel {
+      background:var(--surface); border:1px solid var(--line);
+      border-radius:var(--radius); padding:20px; box-shadow:var(--shadow-sm);
+    }
+    h2 { font-size:16px; font-weight:760; color:var(--purple-2); margin-bottom:14px; letter-spacing:-.2px; }
+
+    /* ── Table ── */
+    .toolbar { display:flex; gap:10px; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
+    .filters { display:flex; gap:8px; flex-wrap:wrap; }
+    .search, select {
+      border:1px solid var(--line); border-radius:var(--radius-sm);
+      background:#fff; height:36px; padding:0 12px; color:var(--ink); font-size:13px;
+    }
+    .search { min-width:220px; }
+    select { cursor:pointer; }
+    .table-wrap { overflow:auto; border:1px solid var(--line); border-radius:var(--radius); background:#fff; }
+    table { width:100%; border-collapse:collapse; min-width:1200px; }
+    th, td { padding:10px 9px; text-align:left; border-bottom:1px solid #f0eaf8; font-size:12.5px; white-space:nowrap; }
+    th {
+      position:sticky; top:0; z-index:1; background:#f8f5ff;
+      color:#5a5270; font-size:10.5px; text-transform:uppercase; letter-spacing:.05em;
+      cursor:pointer; font-weight:700; user-select:none;
+    }
+    th:hover { color:var(--purple); }
+    th.sorted { color:var(--purple); }
+    tbody tr { transition:background .1s; }
+    tbody tr:hover { background:#faf7ff; }
+    .player-name {
+      font-weight:800; color:var(--purple); cursor:pointer; text-decoration:none;
+      border-bottom:1px dashed var(--purple-light);
+    }
+    .player-name:hover { color:var(--purple-2); border-color:var(--purple-2); }
+    .player-status { color:var(--muted); font-size:11.5px; margin-top:1px; }
+
+    /* ── Cell color coding: purple → white → gold ── */
+    .c-elite { background:var(--gold); color:#fff; font-weight:700; border-radius:4px; padding:1px 5px; }
+    .c-good  { background:var(--gold-light); color:#5a3a00; font-weight:600; border-radius:4px; padding:1px 5px; }
+    .c-avg   { }
+    .c-poor  { background:#ddd0f0; color:#2e1260; font-weight:600; border-radius:4px; padding:1px 5px; }
+    .c-bad   { background:var(--purple); color:#fff; font-weight:700; border-radius:4px; padding:1px 5px; }
+
+    /* ── D1 Rankings section ── */
+    .rankings-section {
+      margin-bottom:20px; background:var(--surface); border:1px solid var(--line);
+      border-radius:var(--radius); padding:18px; box-shadow:var(--shadow-sm);
+    }
+    .rankings-head {
+      display:flex; justify-content:space-between; align-items:flex-start; gap:18px;
+      border-bottom:1px solid var(--line); padding-bottom:14px; margin-bottom:14px;
+    }
+    .rankings-head h2 { margin:0 0 5px; font-size:19px; line-height:1.15; }
+    .rankings-head p { color:var(--muted); font-size:12.5px; line-height:1.45; max-width:620px; }
+    .rankings-summary {
+      min-width:168px; border-left:3px solid var(--gold); padding:3px 0 3px 12px;
+      text-align:left;
+    }
+    .rankings-summary strong { display:block; color:var(--purple-2); font-size:24px; line-height:1; }
+    .rankings-summary span { display:block; color:var(--muted); font-size:10px; font-weight:760; text-transform:uppercase; letter-spacing:.06em; margin-top:4px; }
+    .rankings-grid { display:grid; gap:14px; }
+    .rank-group {
+      display:grid; grid-template-columns:176px minmax(0,1fr); gap:12px; align-items:start;
+      padding-top:2px;
+    }
+    .rank-group-title {
+      position:sticky; top:0; color:var(--purple-2); font-size:12px; line-height:1.2;
+      font-weight:860; padding-top:8px;
+    }
+    .rank-group-title span { display:block; margin-top:5px; color:var(--muted); font-size:10px; font-weight:760; text-transform:uppercase; letter-spacing:.06em; }
+    .rank-group-grid {
+      display:grid; gap:0;
+    }
+    .rank-card {
+      position:relative; display:grid; grid-template-columns:118px minmax(0,1fr) 88px;
+      gap:10px; align-items:center; background:transparent; border:0; border-radius:0;
+      padding:6px 0; min-height:36px; box-shadow:none;
+      border-bottom:1px dashed rgba(43,154,170,.55); overflow:visible;
+    }
+    .rank-card::before { display:none; }
+    .rank-top { display:block; min-width:0; }
+    .rank-card .r-label {
+      color:#6a6473; font-size:12.5px; line-height:1.05; font-weight:860;
+      text-align:right; text-transform:none; letter-spacing:0;
+    }
+    .rank-card .r-rank-note {
+      color:#8b8497; font-size:9.5px; line-height:1.15; font-weight:760;
+      text-align:right; margin-top:3px;
+    }
+    .r-percent {
+      position:absolute; top:50%; transform:translate(-50%,-50%);
+      width:28px; height:28px; border-radius:50%; display:grid; place-items:center;
+      color:#fff; border:2px solid #fff; padding:0; font-size:12px; font-weight:900;
+      z-index:2;
+    }
+    .rank-main { min-width:0; }
+    .rank-track { height:22px; background:#dbeeee; position:relative; overflow:hidden; }
+    .rank-track::before {
+      content:""; position:absolute; left:50%; top:0; bottom:0; width:2px;
+      background:rgba(255,255,255,.55); z-index:1;
+    }
+    .rank-fill { display:block; height:100%; min-width:3px; }
+    .rank-card .r-val { font-size:14px; line-height:1; font-weight:860; color:#555; text-align:right; }
+    .rank-card .r-note { margin-top:4px; color:#8b8497; font-size:9.5px; line-height:1.1; text-align:right; font-weight:720; }
+
+    /* ── Mini cards ── */
+    .cards { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin-bottom:20px; }
+    .mini { padding:16px; border:1px solid var(--line); border-radius:var(--radius); background:var(--surface); box-shadow:var(--shadow-sm); }
+    .mini h3 { font-size:13.5px; font-weight:760; margin-bottom:7px; color:var(--purple-2); }
+    .mini p  { color:var(--muted); font-size:12.5px; line-height:1.5; }
+
+    /* ── Player detail modal ── */
+    .modal-overlay {
+      position:fixed; inset:0; background:rgba(20,12,40,.45);
+      z-index:100; opacity:0; pointer-events:none;
+      transition:opacity .25s;
+    }
+    .modal-overlay.open { opacity:1; pointer-events:all; }
+    .modal-panel {
+      position:fixed; top:0; right:0; bottom:0; width:min(100vw,1840px); max-width:none; height:100dvh;
+      background:#fbfaf7; box-shadow:-8px 0 32px rgba(20,12,40,.18);
+      transform:translateX(100%); transition:transform .28s cubic-bezier(.4,0,.2,1);
+      z-index:101; padding:0; display:flex; flex-direction:column; min-width:0;
+    }
+    .modal-panel.open { transform:translateX(0); }
+    .modal-header {
+      padding:14px 20px 12px; flex-shrink:0;
+      border-bottom:1px solid rgba(255,255,255,.15);
+      display:flex; align-items:flex-start; justify-content:space-between; gap:12px;
+      background:linear-gradient(135deg,var(--purple-2) 0%,var(--purple) 100%);
+      color:#fff;
+    }
+    .modal-header h3 { font-size:18px; font-weight:800; color:#fff; line-height:1.2; }
+    .modal-header .modal-meta { font-size:12px; opacity:.75; margin-top:4px; }
+    .modal-close {
+      background:rgba(255,255,255,.18); border:none; color:#fff; cursor:pointer;
+      width:28px; height:28px; border-radius:50%; font-size:16px;
+      display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:1px;
+    }
+    .modal-close:hover { background:rgba(255,255,255,.32); }
+    .modal-body { padding:14px; flex:1; overflow:auto; min-height:0; }
+    .modal-section { margin-bottom:18px; }
+    .modal-section-title {
+      font-size:10px; font-weight:760; text-transform:uppercase; letter-spacing:.08em;
+      color:var(--purple); border-bottom:2px solid var(--soft); padding-bottom:5px; margin-bottom:12px;
+    }
+
+    .player-sheet-grid {
+      display:grid; grid-template-columns:minmax(280px,.9fr) minmax(390px,1.08fr) minmax(340px,.98fr);
+      gap:12px; align-items:start; min-width:0;
+    }
+    .player-sheet-panel {
+      background:#fff; border:1.5px solid #2b9aaa; min-height:0; max-height:calc(100dvh - 86px);
+      overflow:auto; padding:14px; min-width:0;
+    }
+    .bio-hero {
+      min-height:170px; margin:-14px -14px 0; background:linear-gradient(135deg,#3b246c,#d0a61c);
+      position:relative; overflow:visible; display:flex; align-items:flex-end; justify-content:center;
+      background-size:cover; background-position:center top;
+    }
+    .bio-hero::after {
+      content:""; position:absolute; inset:0;
+      background:linear-gradient(180deg,rgba(255,255,255,.08),rgba(0,0,0,.22));
+    }
+    .headshot-placeholder {
+      width:76px; height:76px; border-radius:50%; background:#d7cfea; border:3px solid #fff;
+      position:relative; z-index:3; margin-bottom:-34px; display:grid; place-items:center;
+      color:var(--purple-2); font-weight:900; font-size:27px;
+    }
+    .headshot-photo {
+      width:88px; height:88px; border-radius:50%; border:3px solid #fff;
+      position:relative; z-index:3; margin-bottom:-38px; object-fit:cover; object-position:center top;
+      background:#d7cfea; box-shadow:0 8px 22px rgba(20,12,40,.24);
+    }
+    .bio-name { margin-top:48px; text-align:center; font-size:26px; font-weight:860; color:#111; line-height:1.05; }
+    .bio-meta { margin-top:8px; text-align:center; color:#333; font-size:14px; line-height:1.45; font-weight:600; }
+    .basic-stats {
+      margin-top:18px; border-top:2px solid #222; padding-top:8px;
+      display:grid; grid-template-columns:1fr; gap:0;
+    }
+    .basic-stat-row {
+      display:grid; grid-template-columns:minmax(0,1fr) auto; gap:12px; align-items:center;
+      padding:6px 4px; border-bottom:1px solid #ece8f4; font-size:13px;
+    }
+    .basic-stat-row span:first-child { color:#34303d; font-weight:760; }
+    .basic-stat-row span:last-child { color:#111; font-weight:860; }
+    .trackman-strip {
+      margin-top:10px; background:#d7d7d7; color:#111; display:grid; grid-template-columns:repeat(3,minmax(0,auto));
+      justify-content:space-between; gap:8px; padding:8px 10px; font-size:12px; font-weight:860;
+    }
+    .percentile-title,.chart-title {
+      text-align:center; color:#262626; font-size:22px; line-height:1.05; font-weight:860; margin:0 0 7px;
+    }
+    .dot-rule { text-align:center; color:#2b9aaa; letter-spacing:.16em; font-weight:900; margin-bottom:9px; }
+    .percentile-switch {
+      display:flex; justify-content:center; gap:6px; margin:0 0 10px;
+    }
+    .percentile-switch button {
+      border:1px solid #d8d0ea; background:#fff; color:var(--purple-2);
+      border-radius:6px; padding:5px 8px; font-size:10px; font-weight:860;
+      text-transform:uppercase; letter-spacing:.04em; cursor:pointer;
+    }
+    .percentile-switch button.active {
+      background:var(--purple-2); border-color:var(--purple-2); color:#fff;
+    }
+    .player-d1-view[hidden],.player-percentile-view[hidden] { display:none; }
+    .percentile-group-title {
+      color:#0e0e0e; font-size:17px; font-weight:860; border-bottom:2px solid #2b9aaa;
+      padding:6px 0 5px; margin:8px 0 8px;
+    }
+    .percentile-row {
+      display:grid; grid-template-columns:120px minmax(0,1fr) 44px; gap:7px; align-items:center;
+      padding:3px 0; border-bottom:1px dashed rgba(43,154,170,.55);
+    }
+    .percentile-label { text-align:right; color:#6a6473; font-size:13px; font-weight:760; }
+    .percentile-track { height:22px; background:#dbeeee; position:relative; overflow:hidden; }
+    .percentile-track::before {
+      content:""; position:absolute; left:50%; top:0; bottom:0; width:2px; background:rgba(255,255,255,.55);
+    }
+    .percentile-fill { height:100%; min-width:3px; }
+    .percentile-badge {
+      position:absolute; top:50%; transform:translate(-50%,-50%); width:28px; height:28px;
+      border-radius:50%; color:#fff; display:grid; place-items:center; font-size:12px;
+      font-weight:900; border:2px solid #fff;
+    }
+    .percentile-value { color:#555; font-size:13px; font-weight:700; text-align:right; }
+    .modal-rankings {
+      margin-top:14px; border-top:2px solid #2b9aaa; padding-top:10px;
+    }
+    .modal-rankings-title {
+      color:#0e0e0e; font-size:17px; font-weight:860; margin:0 0 10px;
+    }
+    .team-rank-stat .sv-label span {
+      color:#8b8497; font-size:9px; font-weight:760; margin-left:5px;
+    }
+    .team-rank-stat .sv-value { font-size:18px; display:flex; justify-content:space-between; gap:8px; align-items:baseline; }
+    .team-rank-stat .sv-value small { color:#6a6473; font-size:10px; font-weight:760; }
+    .team-rank-note { color:var(--muted); font-size:10.5px; line-height:1.2; margin-top:4px; }
+    .chart-panel { display:grid; gap:12px; }
+    .fielding-box { background:#fff; border-top:2px solid #2b9aaa; padding-top:10px; }
+    .fielding-summary {
+      display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; margin-bottom:10px;
+    }
+    .fielding-metric { background:#f7f5fb; border:1px solid #e6dfef; padding:8px; }
+    .fielding-metric span { display:block; color:#6a6473; font-size:10px; font-weight:760; text-transform:uppercase; }
+    .fielding-metric strong { display:block; color:#111; font-size:18px; line-height:1.1; margin-top:2px; }
+    .fielding-pct { display:block; font-size:10px; font-weight:860; margin-top:3px; opacity:.86; }
+    .fielding-components { display:grid; gap:4px; }
+    .fielding-row {
+      display:grid; grid-template-columns:minmax(0,1fr) auto; gap:12px; align-items:center;
+      padding:5px 0; border-bottom:1px dashed rgba(43,154,170,.45); font-size:12px;
+    }
+    .fielding-row span:first-child { color:#5f586c; font-weight:720; }
+    .fielding-row span:last-child { color:#111; font-weight:860; }
+    .fielding-value {
+      min-width:76px; text-align:right; border-radius:4px; padding:3px 6px;
+      justify-self:end;
+    }
+    .fielding-value small { display:block; font-size:9px; line-height:1.1; opacity:.82; font-weight:860; }
+    .fielding-source { color:var(--muted); font-size:11px; line-height:1.35; margin-top:8px; }
+    .chart-box { background:#fff; border-top:2px solid #2b9aaa; padding-top:10px; min-height:250px; }
+    .spray-svg,.rolling-svg { width:100%; height:auto; max-height:300px; display:block; }
+    .rolling-svg { max-height:220px; }
+    .chart-empty { color:var(--muted); text-align:center; padding:78px 16px; font-size:13px; }
+    .spray-legend { display:flex; flex-wrap:wrap; gap:12px; justify-content:flex-end; font-size:13px; margin-bottom:4px; }
+    .legend-dot { display:inline-block; width:12px; height:12px; border-radius:50%; margin-right:5px; vertical-align:-1px; border:1px solid #222; }
+
+    /* ── Slash line grid (3-col tiles in wide modal) ── */
+    .slash-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:7px; margin-bottom:4px; }
+    .slash-tile {
+      background:var(--bg); border:1px solid var(--line); border-radius:7px; padding:9px 11px;
+    }
+    .slash-tile .st-label { color:var(--muted); font-size:9.5px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; }
+    .slash-tile .st-val   { font-size:19px; font-weight:860; color:var(--purple-2); margin-top:2px; }
+    .slash-tile .st-val.nd { color:#b0a8bc; font-size:14px; margin-top:6px; }
+
+    /* ── Baseball Savant-style stat bars ── */
+    .sv-stat { margin-bottom:13px; }
+    .sv-header { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:3px; }
+    .sv-label {
+      font-size:9.5px; font-weight:760; text-transform:uppercase;
+      letter-spacing:.07em; color:var(--muted);
+    }
+    .sv-pct { font-size:10.5px; font-weight:700; color:var(--ink); }
+    .sv-value { font-size:21px; font-weight:860; color:var(--purple-2); line-height:1; margin-bottom:5px; }
+    .sv-value.nd { color:#b0a8bc; font-size:14px; }
+    .sv-bar-row { display:flex; align-items:center; gap:7px; }
+    .sv-track {
+      height:7px; background:#ede8f8; border-radius:99px; overflow:hidden; position:relative; flex:1;
+    }
+    .sv-fill { height:100%; border-radius:99px; transition:width .45s cubic-bezier(.4,0,.2,1); }
+    .sv-circle {
+      flex-shrink:0; width:28px; height:28px; border-radius:50%;
+      display:flex; align-items:center; justify-content:center;
+      font-size:9px; font-weight:800; color:#fff; line-height:1;
+    }
+    .sv-cols { display:grid; grid-template-columns:repeat(3,1fr); gap:0 20px; }
+
+    /* ── Responsive ── */
+    @media (max-width:1100px) {
+      .kpis { grid-template-columns:repeat(3,minmax(0,1fr)); }
+      .main-grid { grid-template-columns:1fr; }
+      .rank-group { grid-template-columns:1fr; gap:8px; }
+      .rank-group-title { position:static; padding-top:0; }
+      .modal-panel { width:100vw; max-width:none; }
+      .player-sheet-grid { grid-template-columns:1fr; }
+      .player-sheet-panel { min-height:auto; }
+    }
+    @media (max-width:700px) {
+      .shell { padding:14px; }
+      .kpis { grid-template-columns:1fr 1fr; }
+      .cards { grid-template-columns:1fr; }
+      .rankings-section { padding:14px; }
+      .rankings-head { flex-direction:column; gap:12px; }
+      .rankings-summary { width:100%; border-left:0; border-top:3px solid var(--gold); padding:10px 0 0; }
+      .rank-group-grid { grid-template-columns:1fr; }
+      .toolbar { flex-direction:column; align-items:stretch; }
+      .search { min-width:0; width:100%; }
+      .sv-cols { grid-template-columns:1fr; }
+      .fielding-summary { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <div class="brand">
+        <img class="brand-logo" src="https://1000logos.net/wp-content/uploads/2019/11/Grand-Canyon-Antelopes-Logo.png" alt="Grand Canyon Antelopes logo">
+        <h1>Roster Breakdown</h1>
+      </div>
+    </header>
+
+    <section class="kpis" id="kpis"></section>
+
+    <section class="rankings-section">
+      <div class="rankings-head">
+        <div>
+          <h2>2026 D1 Team Rankings</h2>
+          <p>Where GCU's roster stats would rank against the D1 team pool, grouped by source and context.</p>
+        </div>
+        <div class="rankings-summary">
+          <strong>308</strong>
+          <span>D1-team baseline</span>
+        </div>
+      </div>
+      <div class="rankings-grid" id="rankings"></div>
+    </section>
+
+    <section class="main-grid">
+      <section class="panel">
+        <div class="toolbar">
+          <h2 style="margin:0">Individual Breakdown</h2>
+          <div class="filters">
+            <input class="search" id="search" placeholder="Search player&hellip;" />
+            <select id="position">
+              <option value="all">All positions</option>
+              <option value="C">C</option>
+              <option value="1B">1B</option>
+              <option value="2B">2B</option>
+              <option value="3B">3B</option>
+              <option value="SS">SS</option>
+              <option value="OF">OF</option>
+            </select>
+          </div>
+        </div>
+        <p style="font-size:11.5px;color:var(--muted);margin-bottom:10px;">
+          Click any column header to sort &bull; Click a player name for full Trackman detail
+          &bull; <span style="background:var(--gold);color:#fff;border-radius:3px;padding:0 5px;font-weight:700;">gold</span> = elite &bull;
+          <span style="background:var(--purple);color:#fff;border-radius:3px;padding:0 5px;font-weight:700;">purple</span> = poor — vs D1 qualified hitters
+        </p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th data-key="name">Player</th>
+                <th data-key="position">Pos</th>
+                <th data-key="pa">PA</th>
+                <th data-key="avg">AVG</th>
+                <th data-key="obp">OBP</th>
+                <th data-key="slg">SLG</th>
+                <th data-key="ops">OPS</th>
+                <th data-key="woba">wOBA</th>
+                <th data-key="wrc_plus_proxy">wRC+</th>
+                <th data-key="ops_plus">OPS+</th>
+                <th data-key="iso">ISO</th>
+                <th data-key="walk_rate">BB%</th>
+                <th data-key="k_rate">K%</th>
+                <th data-key="contact_rate">Con%</th>
+                <th data-key="chase_rate">Chase%</th>
+                <th data-key="hard_hit_pct">HH%</th>
+                <th data-key="avg_ev">Avg EV</th>
+                <th data-key="sb">SB</th>
+                <th data-key="war">WAR</th>
+                <th data-key="war_per_55">WAR/55</th>
+                <th data-key="drs">DRS</th>
+              </tr>
+            </thead>
+            <tbody id="players"></tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+
+    <section class="cards">
+      <div class="mini"><h3>Quality At-Bat</h3><p>Hits, walks/HBP, sacrifices, barrels, 8+ pitch PAs, and 4+ pitches after 0-2. Productive-out runner movement needs runner-state tags.</p></div>
+      <div class="mini"><h3>Baserunning</h3><p>SB from event notes only. Extra bases, first-to-third, and outs on base need runner advancement data.</p></div>
+      <div class="mini"><h3>Defense</h3><p>Team defensive conversion: opponent in-play outs / (outs + errors). Individual FPCT needs fielder-level PO/A/E data.</p></div>
+      <div class="mini"><h3>Lineup Build</h3><p>Use filters to identify OBP bats, ISO threats, K risk, and depth beyond the tracked group.</p></div>
+    </section>
+  </main>
+
+  <!-- Player detail modal -->
+  <div class="modal-overlay" id="modalOverlay"></div>
+  <aside class="modal-panel" id="modalPanel">
+    <div class="modal-header">
+      <div>
+        <h3 id="modalName">Player</h3>
+        <div class="modal-meta" id="modalMeta"></div>
+      </div>
+      <button class="modal-close" id="modalClose" aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+  </aside>
+
+  <script>
+    const DATA = {"team":{"games":31,"tracked_players":13,"roster_players":13,"avg":".277","obp":".364","slg":".436","ops":".800","k_rate":"18.7%","bb_rate":"9.0%","hard_hit_pct":"32.8%","chase_rate":"26.4%","contact_rate":"75.8%","defensive_conversion":"96.5%","baserunning":"SB notes only","qab":"51.8%","xbh_rate":"8.7%","fpct_est":".965","qab_count":609,"qab_pa":1176},"players":[{"name":"Brady Francisco","csv":"Francisco, Brady","position":"C","source_team":"OKL_COW","pa":33,"ab":28,"pitches":132,"bats":"R","h":8,"1b":7,"2b":0,"3b":0,"hr":1,"xbh":1,"bb":3,"k":9,"hbp":1,"sac":1,"sb":0,"rbi_proxy":2,"avg":0.2857142857142857,"obp":0.36363636363636365,"slg":0.39285714285714285,"ops":0.7564935064935066,"iso":0.10714285714285715,"woba":0.292,"wrc_plus_proxy":57,"walk_rate":0.09090909090909091,"k_rate":0.2727272727272727,"bb_k":0.3333333333333333,"swing_rate":0.45454545454545453,"chase_rate":0.2318840579710145,"contact_rate":0.684,"zone_contact_rate":0.769,"whiff_rate":0.316,"avg_ev":75.5,"ev90":88.6,"hard_hit_pct":0.1,"barrel_pct":0.0,"ld_pct":0.1,"gb_pct":0.4,"fb_pct":0.5,"sweet_spot":0.3,"qab":0.576,"fpct":null,"status":"Transfer: OKL_COW","avgDisplay":".286","obpDisplay":".364","slgDisplay":".393","opsDisplay":".756","isoDisplay":".107","wobaDisplay":".292","walkRateDisplay":"9.1%","kRateDisplay":"27.3%","bbKDisplay":"0.33","chaseRateDisplay":"23.2%","swingRateDisplay":"45.5%","contactRateDisplay":"73.3%","whiffRateDisplay":"26.7%","avgEvDisplay":"75.5","ev90Display":"102.3","hardHitDisplay":"10.0%","barrelDisplay":"0.0%","ldDisplay":"15.8%","gbDisplay":"36.8%","fbDisplay":"26.3%","sweetDisplay":"15.8%","qabDisplay":"57.6%","fpctDisplay":"--","wrcPlusDisplay":"57","ops_plus":58,"opsPlusDisplay":"58","war":-0.06,"owar":0.01,"drs":-0.92,"defensive_runs_saved":-0.92,"framing_runs_saved":-3.56,"pitches_framed":247,"stolen_base_runs":0.29,"pickoff_runs":1.28,"throwing_runs":1.57,"infield_gb_runs":0.03,"double_play_runs_start":0.0,"double_play_runs_pivot":0.0,"infield_fb_runs":0.0,"bunt_runs":0.0,"outfield_fb_runs":0.0,"outfield_arm_runs":0.0,"blocking_runs":1.03,"synergy_pos":"C","trackman_bbe":10,"spray_points":[{"x":284.0,"y":211.1,"category":"Single","result":"Single","exit_velocity":68.0,"launch_angle":27.5,"distance":214.0},{"x":291.6,"y":149.9,"category":"Out","result":"Out","exit_velocity":60.2,"launch_angle":61.3,"distance":138.0},{"x":286.9,"y":135.8,"category":"Out","result":"Out","exit_velocity":58.1,"launch_angle":62.6,"distance":120.0},{"x":279.4,"y":41.6,"category":"Out","result":"Out","exit_velocity":75.2,"launch_angle":-62.3,"distance":2.0},{"x":260.5,"y":183.4,"category":"Single","result":"Single","exit_velocity":105.1,"launch_angle":7.1,"distance":181.0},{"x":318.7,"y":187.7,"category":"Single","result":"Single","exit_velocity":83.2,"launch_angle":12.1,"distance":191.0},{"x":284.7,"y":70.0,"category":"Single","result":"Single","exit_velocity":69.3,"launch_angle":-1.2,"distance":38.0},{"x":197.7,"y":250.8,"category":"Out","result":"Out","exit_velocity":86.7,"launch_angle":39.5,"distance":283.0},{"x":276.7,"y":41.4,"category":"Single","result":"Single","exit_velocity":81.0,"launch_angle":-38.5,"distance":5.0},{"x":179.9,"y":200.5,"category":"Single","result":"Single","exit_velocity":74.0,"launch_angle":25.2,"distance":237.0},{"x":274.5,"y":47.1,"category":"Single","result":"Single","exit_velocity":99.5,"launch_angle":-10.4,"distance":11.0},{"x":155.9,"y":294.1,"category":"HomeRun","result":"HomeRun","exit_velocity":92.0,"launch_angle":36.3,"distance":353.0},{"x":337.2,"y":265.4,"category":"Out","result":"Out","exit_velocity":86.1,"launch_angle":38.7,"distance":291.0},{"x":259.0,"y":122.4,"category":"Out","result":"Out","exit_velocity":107.0,"launch_angle":4.4,"distance":106.0},{"x":260.1,"y":331.9,"category":"Out","result":"Out","exit_velocity":96.6,"launch_angle":38.8,"distance":366.0},{"x":278.2,"y":48.5,"category":"Out","result":"Out","exit_velocity":72.3,"launch_angle":-15.9,"distance":11.0}],"rolling_xslg":[{"x":1,"y":0.487},{"x":2,"y":0.594},{"x":3,"y":0.588},{"x":4,"y":0.526},{"x":5,"y":0.493},{"x":6,"y":0.449}],"trackman_team":"OKL_COW","slg_con":0.449,"r":10,"rbi":2,"war_per_55":-0.0011,"qab_count":19,"qab_pa":33,"qab_criteria":{"hit":8,"walk":3,"hbp":1,"sacrifice":1,"barrel":0,"eight_pitch":8,"battle_02":1},"qab_productive_out_available":false,"headshot":"gcu_player_assets/brady-francisco-headshot.png","header":"gcu_player_assets/brady-francisco-header.png","header_position":"50.0% 65.8%"},{"name":"Tanner Johns","csv":"Johns, Tanner","position":"1B","source_team":"GRA_CAN","pa":70,"ab":64,"pitches":256,"bats":"L","h":21,"1b":14,"2b":5,"3b":0,"hr":2,"xbh":7,"bb":4,"k":19,"hbp":2,"sac":0,"sb":1,"rbi_proxy":14,"avg":0.328125,"obp":0.38571428571428573,"slg":0.5,"ops":0.8857142857142857,"iso":0.171875,"woba":0.397,"wrc_plus_proxy":115,"walk_rate":0.05714285714285714,"k_rate":0.2714285714285714,"bb_k":0.21052631578947367,"swing_rate":0.51953125,"chase_rate":0.3717948717948718,"contact_rate":0.554,"zone_contact_rate":0.621,"whiff_rate":0.446,"avg_ev":82.6,"ev90":99.1,"hard_hit_pct":0.321,"barrel_pct":0.036,"ld_pct":0.25,"gb_pct":0.607,"fb_pct":0.143,"sweet_spot":0.321,"qab":0.507,"fpct":null,"status":"Tracked","avgDisplay":".328","obpDisplay":".386","slgDisplay":".500","opsDisplay":".886","isoDisplay":".172","wobaDisplay":".397","walkRateDisplay":"5.7%","kRateDisplay":"27.1%","bbKDisplay":"0.21","chaseRateDisplay":"37.2%","swingRateDisplay":"52.0%","contactRateDisplay":"63.9%","whiffRateDisplay":"36.1%","avgEvDisplay":"82.6","ev90Display":"103.4","hardHitDisplay":"32.1%","barrelDisplay":"3.6%","ldDisplay":"34.1%","gbDisplay":"50.0%","fbDisplay":"11.4%","sweetDisplay":"36.4%","qabDisplay":"50.7%","fpctDisplay":"--","wrcPlusDisplay":"115","ops_plus":111,"opsPlusDisplay":"111","war":0.88,"owar":0.73,"drs":1.99,"defensive_runs_saved":1.99,"framing_runs_saved":0.0,"pitches_framed":0,"stolen_base_runs":0.0,"pickoff_runs":0.0,"throwing_runs":0.0,"infield_gb_runs":0.0,"double_play_runs_start":0.0,"double_play_runs_pivot":0.0,"infield_fb_runs":0.0,"bunt_runs":0.0,"outfield_fb_runs":0.14,"outfield_arm_runs":1.87,"blocking_runs":0.0,"fld_po":58,"fld_a":3,"fld_e":2,"fld_pct":0.968,"fld_idp":1,"fld_pb":null,"synergy_pos":"LF","trackman_bbe":28,"spray_points":[{"x":203.6,"y":182.0,"category":"Single","result":"Single","exit_velocity":71.2,"launch_angle":25.0,"distance":202.0},{"x":256.6,"y":217.1,"category":"Single","result":"Single","exit_velocity":75.3,"launch_angle":20.5,"distance":223.0},{"x":292.1,"y":167.2,"category":"Single","result":"Single","exit_velocity":98.2,"launch_angle":7.4,"distance":160.0},{"x":280.7,"y":44.5,"category":"Out","result":"Out","exit_velocity":80.3,"launch_angle":-22.6,"distance":6.0},{"x":279.9,"y":45.2,"category":"Out","result":"Out","exit_velocity":68.4,"launch_angle":-24.6,"distance":7.0},{"x":278.4,"y":244.0,"category":"Single","result":"Single","exit_velocity":89.2,"launch_angle":15.4,"distance":255.0},{"x":280.2,"y":41.2,"category":"Out","result":"Out","exit_velocity":79.7,"launch_angle":-67.6,"distance":2.0},{"x":279.1,"y":51.8,"category":"Out","result":"Out","exit_velocity":97.7,"launch_angle":-8.5,"distance":15.0},{"x":250.6,"y":235.1,"category":"Single","result":"Single","exit_velocity":81.6,"launch_angle":18.5,"distance":247.0},{"x":294.5,"y":327.9,"category":"Out","result":"Out","exit_velocity":104.6,"launch_angle":19.6,"distance":360.0},{"x":259.4,"y":95.5,"category":"Single","result":"Single","exit_velocity":103.4,"launch_angle":1.1,"distance":74.0},{"x":355.6,"y":155.4,"category":"Double","result":"Double","exit_velocity":98.3,"launch_angle":10.9,"distance":172.0},{"x":285.3,"y":59.8,"category":"Out","result":"Out","exit_velocity":101.0,"launch_angle":-6.1,"distance":26.0},{"x":257.8,"y":280.9,"category":"Out","result":"Out","exit_velocity":95.4,"launch_angle":21.0,"distance":302.0},{"x":283.3,"y":41.9,"category":"Out","result":"Out","exit_velocity":66.7,"launch_angle":-31.9,"distance":5.0},{"x":309.9,"y":72.7,"category":"Out","result":"Out","exit_velocity":91.9,"launch_angle":1.1,"distance":55.0},{"x":380.1,"y":231.2,"category":"Single","result":"Single","exit_velocity":96.6,"launch_angle":19.7,"distance":270.0},{"x":278.7,"y":41.5,"category":"Single","result":"Single","exit_velocity":72.5,"launch_angle":-32.2,"distance":3.0},{"x":298.5,"y":60.0,"category":"Out","result":"Out","exit_velocity":86.2,"launch_angle":-2.2,"distance":34.0},{"x":282.9,"y":47.9,"category":"Out","result":"Out","exit_velocity":90.1,"launch_angle":-15.1,"distance":11.0},{"x":281.9,"y":40.6,"category":"Out","result":"Out","exit_velocity":34.6,"launch_angle":-52.8,"distance":2.0},{"x":356.5,"y":351.9,"category":"HomeRun","result":"HomeRun","exit_velocity":101.6,"launch_angle":30.3,"distance":401.0},{"x":317.9,"y":163.6,"category":"Out","result":"Out","exit_velocity":100.0,"launch_angle":8.6,"distance":162.0},{"x":222.2,"y":256.5,"category":"Out","result":"Out","exit_velocity":97.2,"launch_angle":16.2,"distance":280.0},{"x":273.1,"y":61.4,"category":"Out","result":"Out","exit_velocity":101.7,"launch_angle":-0.8,"distance":28.0},{"x":291.8,"y":68.8,"category":"Out","result":"Out","exit_velocity":101.2,"launch_angle":-0.4,"distance":39.0},{"x":335.6,"y":104.8,"category":"Double","result":"Double","exit_velocity":95.2,"launch_angle":6.4,"distance":107.0},{"x":289.9,"y":140.8,"category":"Single","result":"Single","exit_velocity":104.1,"launch_angle":6.3,"distance":127.0},{"x":200.4,"y":293.9,"category":"Out","result":"Out","exit_velocity":96.0,"launch_angle":33.2,"distance":333.0},{"x":271.2,"y":122.7,"category":"Out","result":"Error","exit_velocity":76.0,"launch_angle":8.2,"distance":104.0},{"x":283.5,"y":47.0,"category":"Single","result":"Single","exit_velocity":74.9,"launch_angle":-12.2,"distance":10.0},{"x":228.2,"y":190.6,"category":"Single","result":"Single","exit_velocity":65.3,"launch_angle":40.3,"distance":199.0},{"x":254.3,"y":249.2,"category":"Double","result":"Double","exit_velocity":104.0,"launch_angle":11.0,"distance":263.0},{"x":326.7,"y":137.8,"category":"Single","result":"Single","exit_velocity":95.8,"launch_angle":8.0,"distance":136.0},{"x":331.3,"y":357.7,"category":"HomeRun","result":"HomeRun","exit_velocity":104.4,"launch_angle":31.7,"distance":402.0},{"x":288.1,"y":60.3,"category":"Out","result":"Out","exit_velocity":87.4,"launch_angle":-5.1,"distance":27.0},{"x":234.2,"y":303.9,"category":"Double","result":"Double","exit_velocity":94.4,"launch_angle":20.9,"distance":335.0},{"x":157.1,"y":296.1,"category":"Out","result":"Out","exit_velocity":95.1,"launch_angle":37.0,"distance":355.0},{"x":257.6,"y":197.5,"category":"Single","result":"Single","exit_velocity":101.9,"launch_angle":8.9,"distance":199.0}],"rolling_xslg":[{"x":1,"y":0.562},{"x":2,"y":0.586},{"x":3,"y":0.575},{"x":4,"y":0.568},{"x":5,"y":0.505},{"x":6,"y":0.454},{"x":7,"y":0.417},{"x":8,"y":0.386},{"x":9,"y":0.377},{"x":10,"y":0.39},{"x":11,"y":0.465},{"x":12,"y":0.486},{"x":13,"y":0.498},{"x":14,"y":0.498},{"x":15,"y":0.514},{"x":16,"y":0.493},{"x":17,"y":0.473},{"x":18,"y":0.489},{"x":19,"y":0.472},{"x":20,"y":0.452},{"x":21,"y":0.434},{"x":22,"y":0.417},{"x":23,"y":0.413},{"x":24,"y":0.409}],"trackman_team":"GRA_CAN","slg_con":0.409,"r":18,"rbi":22,"war_per_55":0.016,"qab_count":36,"qab_pa":71,"qab_criteria":{"hit":21,"walk":4,"hbp":2,"sacrifice":0,"barrel":3,"eight_pitch":15,"battle_02":2},"qab_productive_out_available":false,"headshot":"gcu_player_assets/tanner-johns-headshot.jpeg","header":"gcu_player_assets/tanner-johns-header.webp"},{"name":"Sam Richardson","csv":"Richardson, Sam","position":"1B","aliases":["Richardson, Samuel"],"source_team":"JAC_GAM","pa":87,"ab":74,"pitches":308,"bats":"R","h":19,"1b":8,"2b":3,"3b":0,"hr":8,"xbh":11,"bb":7,"k":24,"hbp":5,"sac":1,"sb":2,"rbi_proxy":25,"avg":0.25675675675675674,"obp":0.3563218390804598,"slg":0.6216216216216216,"ops":0.9779434607020814,"iso":0.36486486486486486,"woba":0.414,"wrc_plus_proxy":130,"walk_rate":0.08045977011494253,"k_rate":0.27586206896551724,"bb_k":0.2916666666666667,"swing_rate":0.538961038961039,"chase_rate":0.3701657458563536,"contact_rate":0.389,"zone_contact_rate":0.611,"whiff_rate":0.611,"avg_ev":93.3,"ev90":103.9,"hard_hit_pct":0.643,"barrel_pct":0.214,"ld_pct":0.357,"gb_pct":0.357,"fb_pct":0.286,"sweet_spot":0.429,"qab":0.523,"fpct":null,"status":"Transfer: JAC_GAM","avgDisplay":".257","obpDisplay":".356","slgDisplay":".622","opsDisplay":".978","isoDisplay":".365","wobaDisplay":".414","walkRateDisplay":"8.0%","kRateDisplay":"27.6%","bbKDisplay":"0.29","chaseRateDisplay":"37.0%","swingRateDisplay":"53.9%","contactRateDisplay":"61.4%","whiffRateDisplay":"38.6%","avgEvDisplay":"93.3","ev90Display":"106.8","hardHitDisplay":"64.3%","barrelDisplay":"21.4%","ldDisplay":"29.4%","gbDisplay":"41.2%","fbDisplay":"23.5%","sweetDisplay":"35.3%","qabDisplay":"52.3%","fpctDisplay":"--","wrcPlusDisplay":"130","ops_plus":124,"opsPlusDisplay":"124","war":0.76,"owar":0.75,"drs":0.09,"defensive_runs_saved":0.09,"framing_runs_saved":0.0,"pitches_framed":0,"stolen_base_runs":0.0,"pickoff_runs":0.0,"throwing_runs":0.0,"infield_gb_runs":0.09,"double_play_runs_start":0.0,"double_play_runs_pivot":0.0,"infield_fb_runs":0.0,"bunt_runs":0.0,"outfield_fb_runs":0.0,"outfield_arm_runs":0.0,"blocking_runs":0.0,"fld_po":23,"fld_a":null,"fld_e":2,"fld_pct":0.92,"fld_idp":2,"fld_pb":null,"synergy_pos":"DH","trackman_bbe":14,"spray_points":[{"x":334.3,"y":283.4,"category":"Out","result":"Out","exit_velocity":106.1,"launch_angle":15.2,"distance":312.0},{"x":176.9,"y":191.6,"category":"Double","result":"Double","exit_velocity":102.4,"launch_angle":13.8,"distance":229.0},{"x":277.5,"y":44.3,"category":"Single","result":"Single","exit_velocity":92.0,"launch_angle":-25.1,"distance":6.0},{"x":278.2,"y":47.8,"category":"Out","result":"Out","exit_velocity":54.5,"launch_angle":-16.4,"distance":10.0},{"x":191.5,"y":248.1,"category":"Out","result":"Out","exit_velocity":84.0,"launch_angle":21.1,"distance":283.0},{"x":277.2,"y":47.7,"category":"Out","result":"Out","exit_velocity":103.6,"launch_angle":-14.7,"distance":10.0},{"x":250.6,"y":83.1,"category":"Out","result":"Out","exit_velocity":90.3,"launch_angle":2.0,"distance":65.0},{"x":281.1,"y":40.6,"category":"Single","result":"Single","exit_velocity":64.7,"launch_angle":-66.0,"distance":2.0},{"x":186.3,"y":305.1,"category":"Out","result":"Out","exit_velocity":102.6,"launch_angle":32.4,"distance":351.0},{"x":130.5,"y":294.2,"category":"HomeRun","result":"HomeRun","exit_velocity":104.1,"launch_angle":22.6,"distance":369.0},{"x":227.5,"y":314.3,"category":"Out","result":"Out","exit_velocity":101.9,"launch_angle":30.0,"distance":349.0},{"x":337.8,"y":292.0,"category":"Out","result":"Out","exit_velocity":97.4,"launch_angle":35.1,"distance":323.0},{"x":240.9,"y":359.1,"category":"Out","result":"Out","exit_velocity":101.6,"launch_angle":22.2,"distance":402.0},{"x":338.4,"y":235.9,"category":"Out","result":"Out","exit_velocity":84.5,"launch_angle":19.1,"distance":255.0},{"x":102.8,"y":303.7,"category":"HomeRun","result":"HomeRun","exit_velocity":104.8,"launch_angle":35.2,"distance":397.0},{"x":281.2,"y":42.6,"category":"Out","result":"Out","exit_velocity":45.0,"launch_angle":-56.9,"distance":4.0},{"x":349.6,"y":170.7,"category":"Out","result":"Out","exit_velocity":83.5,"launch_angle":55.9,"distance":185.0},{"x":344.7,"y":302.6,"category":"Out","result":"Out","exit_velocity":96.7,"launch_angle":22.1,"distance":338.0},{"x":170.6,"y":327.2,"category":"HomeRun","result":"HomeRun","exit_velocity":108.9,"launch_angle":19.1,"distance":384.0},{"x":280.9,"y":49.2,"category":"Out","result":"FieldersChoice","exit_velocity":104.1,"launch_angle":-13.9,"distance":12.0},{"x":282.1,"y":46.3,"category":"Out","result":"Out","exit_velocity":82.2,"launch_angle":-22.4,"distance":8.0},{"x":224.5,"y":149.8,"category":"Single","result":"Single","exit_velocity":106.8,"launch_angle":6.8,"distance":154.0},{"x":281.7,"y":44.2,"category":"Out","result":"Out","exit_velocity":82.0,"launch_angle":-24.9,"distance":6.0},{"x":286.4,"y":51.0,"category":"Single","result":"Single","exit_velocity":91.8,"launch_angle":-9.4,"distance":16.0},{"x":357.8,"y":221.2,"category":"Out","result":"Out","exit_velocity":84.1,"launch_angle":46.5,"distance":246.0},{"x":273.8,"y":278.9,"category":"Out","result":"Out","exit_velocity":106.3,"launch_angle":10.2,"distance":299.0},{"x":223.1,"y":324.2,"category":"Out","result":"Out","exit_velocity":101.4,"launch_angle":37.9,"distance":362.0},{"x":147.6,"y":325.3,"category":"HomeRun","result":"HomeRun","exit_velocity":101.4,"launch_angle":33.6,"distance":393.0},{"x":277.9,"y":44.3,"category":"Out","result":"Out","exit_velocity":87.4,"launch_angle":-32.2,"distance":6.0},{"x":400.3,"y":214.3,"category":"Double","result":"Double","exit_velocity":102.2,"launch_angle":15.1,"distance":265.0},{"x":241.6,"y":391.7,"category":"HomeRun","result":"HomeRun","exit_velocity":105.6,"launch_angle":23.8,"distance":442.0},{"x":279.4,"y":42.3,"category":"Out","result":"Out","exit_velocity":87.1,"launch_angle":-44.6,"distance":3.0},{"x":272.3,"y":52.3,"category":"Out","result":"Out","exit_velocity":100.0,"launch_angle":-4.7,"distance":18.0},{"x":142.8,"y":245.1,"category":"Single","result":"Single","exit_velocity":107.4,"launch_angle":16.0,"distance":308.0},{"x":227.5,"y":378.5,"category":"HomeRun","result":"HomeRun","exit_velocity":106.8,"launch_angle":24.7,"distance":428.0},{"x":245.0,"y":154.4,"category":"Out","result":"Out","exit_velocity":95.8,"launch_angle":8.5,"distance":149.0},{"x":269.6,"y":78.7,"category":"Out","result":"Out","exit_velocity":67.0,"launch_angle":1.5,"distance":50.0},{"x":220.5,"y":378.0,"category":"HomeRun","result":"HomeRun","exit_velocity":108.3,"launch_angle":22.8,"distance":429.0},{"x":278.3,"y":43.8,"category":"Out","result":"FieldersChoice","exit_velocity":44.9,"launch_angle":-64.7,"distance":5.0},{"x":169.7,"y":193.1,"category":"Double","result":"Double","exit_velocity":111.9,"launch_angle":14.1,"distance":236.0},{"x":289.4,"y":55.8,"category":"Single","result":"Single","exit_velocity":75.3,"launch_angle":-7.4,"distance":23.0},{"x":279.3,"y":37.8,"category":"Single","result":"Single","exit_velocity":66.5,"launch_angle":-79.0,"distance":3.0},{"x":383.5,"y":339.7,"category":"HomeRun","result":"HomeRun","exit_velocity":102.5,"launch_angle":23.5,"distance":396.0},{"x":336.2,"y":135.5,"category":"Out","result":"Out","exit_velocity":105.3,"launch_angle":5.4,"distance":139.0},{"x":283.3,"y":46.6,"category":"Single","result":"Single","exit_velocity":106.5,"launch_angle":-17.8,"distance":9.0}],"rolling_xslg":[{"x":1,"y":0.709},{"x":2,"y":0.726},{"x":3,"y":0.63},{"x":4,"y":0.589},{"x":5,"y":0.695},{"x":6,"y":0.789},{"x":7,"y":0.857},{"x":8,"y":0.828},{"x":9,"y":0.827},{"x":10,"y":0.871}],"r":16,"rbi":26,"war_per_55":0.0138,"headshot":"gcu_player_assets/sam-richardson-headshot.png","header":"gcu_player_assets/sam-richardson-header.png","header_position":"50.0% 23.9%","trackman_team":"JAC_GAM","qab_count":46,"qab_pa":88,"qab_criteria":{"hit":19,"walk":7,"hbp":5,"sacrifice":1,"barrel":15,"eight_pitch":15,"battle_02":7},"qab_productive_out_available":false,"slg_con":0.871},{"name":"Billy Scaldeferri","csv":"Scaldeferri, Billy","position":"3B","source_team":"GRA_CAN","pa":128,"ab":115,"pitches":488,"bats":"R","h":34,"1b":21,"2b":7,"3b":2,"hr":4,"xbh":13,"bb":7,"k":24,"hbp":3,"sac":3,"sb":4,"rbi_proxy":27,"avg":0.2956521739130435,"obp":0.34375,"slg":0.4956521739130435,"ops":0.8394021739130435,"iso":0.2,"woba":0.376,"wrc_plus_proxy":105,"walk_rate":0.0546875,"k_rate":0.1875,"bb_k":0.2916666666666667,"swing_rate":0.47540983606557374,"chase_rate":0.3320610687022901,"contact_rate":0.718,"zone_contact_rate":0.841,"whiff_rate":0.282,"avg_ev":87.5,"ev90":103.0,"hard_hit_pct":0.339,"barrel_pct":0.107,"ld_pct":0.286,"gb_pct":0.357,"fb_pct":0.357,"sweet_spot":0.429,"qab":0.508,"fpct":null,"status":"Tracked","avgDisplay":".296","obpDisplay":".344","slgDisplay":".496","opsDisplay":".839","isoDisplay":".200","wobaDisplay":".376","walkRateDisplay":"5.5%","kRateDisplay":"18.8%","bbKDisplay":"0.29","chaseRateDisplay":"33.2%","swingRateDisplay":"47.5%","contactRateDisplay":"78.4%","whiffRateDisplay":"21.6%","avgEvDisplay":"87.5","ev90Display":"101.9","hardHitDisplay":"33.9%","barrelDisplay":"10.7%","ldDisplay":"26.9%","gbDisplay":"36.6%","fbDisplay":"29.0%","sweetDisplay":"43.0%","qabDisplay":"50.8%","fpctDisplay":"--","wrcPlusDisplay":"105","ops_plus":100,"opsPlusDisplay":"100","war":1.71,"owar":1.24,"drs":6.39,"defensive_runs_saved":6.39,"framing_runs_saved":0.0,"pitches_framed":0,"stolen_base_runs":0.0,"pickoff_runs":0.0,"throwing_runs":0.0,"infield_gb_runs":-0.02,"double_play_runs_start":-0.04,"double_play_runs_pivot":0.0,"infield_fb_runs":0.0,"bunt_runs":-0.05,"outfield_fb_runs":5.5,"outfield_arm_runs":1.01,"blocking_runs":0.0,"fld_po":87,"fld_a":8,"fld_e":null,"fld_pct":1.0,"fld_idp":1,"fld_pb":null,"synergy_pos":"RF","trackman_bbe":56,"spray_points":[{"x":278.7,"y":222.3,"category":"Single","result":"Single","exit_velocity":100.9,"launch_angle":10.6,"distance":228.0},{"x":278.9,"y":47.0,"category":"Single","result":"Single","exit_velocity":86.6,"launch_angle":-21.3,"distance":9.0},{"x":242.4,"y":144.4,"category":"Out","result":"Error","exit_velocity":76.1,"launch_angle":12.1,"distance":139.0},{"x":278.1,"y":57.7,"category":"Out","result":"Out","exit_velocity":66.6,"launch_angle":-1.1,"distance":22.0},{"x":145.0,"y":241.9,"category":"Double","result":"Double","exit_velocity":82.7,"launch_angle":24.9,"distance":304.0},{"x":344.7,"y":189.9,"category":"Single","result":"Single","exit_velocity":65.8,"launch_angle":31.5,"distance":204.0},{"x":289.8,"y":156.9,"category":"Out","result":"Out","exit_velocity":68.8,"launch_angle":59.1,"distance":147.0},{"x":181.7,"y":365.0,"category":"HomeRun","result":"HomeRun","exit_velocity":102.7,"launch_angle":27.7,"distance":424.0},{"x":276.4,"y":45.1,"category":"Out","result":"Out","exit_velocity":78.7,"launch_angle":-15.9,"distance":8.0},{"x":282.8,"y":238.8,"category":"Single","result":"Single","exit_velocity":78.4,"launch_angle":22.2,"distance":249.0},{"x":235.7,"y":309.6,"category":"Out","result":"Out","exit_velocity":103.9,"launch_angle":14.6,"distance":342.0},{"x":137.2,"y":259.2,"category":"HomeRun","result":"HomeRun","exit_velocity":90.7,"launch_angle":32.6,"distance":327.0},{"x":277.2,"y":41.2,"category":"Out","result":"Out","exit_velocity":61.8,"launch_angle":-52.8,"distance":4.0},{"x":268.8,"y":54.8,"category":"Out","result":"Out","exit_velocity":74.3,"launch_angle":-3.8,"distance":23.0},{"x":309.7,"y":289.2,"category":"Out","result":"Out","exit_velocity":89.6,"launch_angle":32.2,"distance":314.0},{"x":340.5,"y":211.6,"category":"Single","result":"Single","exit_velocity":95.7,"launch_angle":11.9,"distance":227.0},{"x":226.0,"y":245.1,"category":"Double","result":"Double","exit_velocity":96.1,"launch_angle":15.6,"distance":265.0},{"x":180.1,"y":330.1,"category":"Double","result":"Double","exit_velocity":96.0,"launch_angle":31.7,"distance":384.0},{"x":282.0,"y":43.6,"category":"Out","result":"Out","exit_velocity":81.7,"launch_angle":-33.8,"distance":5.0},{"x":176.6,"y":270.8,"category":"Out","result":"Sacrifice","exit_velocity":92.6,"launch_angle":43.3,"distance":316.0},{"x":164.4,"y":243.4,"category":"Double","result":"Double","exit_velocity":107.2,"launch_angle":16.9,"distance":292.0},{"x":297.5,"y":66.0,"category":"Out","result":"Out","exit_velocity":74.7,"launch_angle":-2.1,"distance":39.0},{"x":268.6,"y":93.6,"category":"Out","result":"Out","exit_velocity":97.6,"launch_angle":1.5,"distance":68.0},{"x":276.4,"y":49.0,"category":"Out","result":"FieldersChoice","exit_velocity":96.2,"launch_angle":-8.6,"distance":12.0},{"x":256.0,"y":160.8,"category":"Double","result":"Double","exit_velocity":97.0,"launch_angle":11.0,"distance":154.0},{"x":173.8,"y":241.8,"category":"Out","result":"Out","exit_velocity":81.6,"launch_angle":27.3,"distance":285.0},{"x":199.8,"y":337.8,"category":"Double","result":"Double","exit_velocity":99.8,"launch_angle":23.5,"distance":386.0},{"x":332.5,"y":229.4,"category":"Out","result":"Out","exit_velocity":73.4,"launch_angle":34.4,"distance":246.0},{"x":228.5,"y":348.1,"category":"Triple","result":"Triple","exit_velocity":103.7,"launch_angle":31.7,"distance":390.0},{"x":223.4,"y":350.5,"category":"HomeRun","result":"HomeRun","exit_velocity":103.2,"launch_angle":34.4,"distance":394.0},{"x":244.0,"y":315.2,"category":"Out","result":"Out","exit_velocity":94.5,"launch_angle":35.6,"distance":347.0},{"x":300.1,"y":133.3,"category":"Out","result":"Out","exit_velocity":83.4,"launch_angle":7.1,"distance":119.0},{"x":278.7,"y":61.8,"category":"Single","result":"Single","exit_velocity":102.0,"launch_angle":-4.5,"distance":27.0},{"x":282.9,"y":44.7,"category":"Out","result":"Out","exit_velocity":89.9,"launch_angle":-20.5,"distance":7.0},{"x":183.8,"y":228.8,"category":"Single","result":"Single","exit_velocity":107.0,"launch_angle":15.2,"distance":265.0},{"x":315.9,"y":323.0,"category":"Out","result":"Out","exit_velocity":93.9,"launch_angle":24.3,"distance":357.0},{"x":162.9,"y":239.4,"category":"Single","result":"Single","exit_velocity":106.8,"launch_angle":15.5,"distance":289.0},{"x":277.1,"y":45.9,"category":"Out","result":"Out","exit_velocity":57.7,"launch_angle":-33.1,"distance":8.0},{"x":265.2,"y":144.8,"category":"Single","result":"Single","exit_velocity":85.3,"launch_angle":9.2,"distance":132.0},{"x":254.4,"y":340.6,"category":"Out","result":"Out","exit_velocity":100.1,"launch_angle":27.2,"distance":377.0},{"x":260.8,"y":69.7,"category":"Out","result":"Out","exit_velocity":79.8,"launch_angle":-2.1,"distance":44.0},{"x":281.3,"y":63.9,"category":"Out","result":"Out","exit_velocity":99.8,"launch_angle":-4.2,"distance":30.0},{"x":227.5,"y":299.7,"category":"Out","result":"Out","exit_velocity":94.6,"launch_angle":41.8,"distance":331.0},{"x":301.7,"y":237.5,"category":"Single","result":"Single","exit_velocity":98.5,"launch_angle":13.9,"distance":248.0},{"x":280.2,"y":46.6,"category":"Out","result":"Out","exit_velocity":91.7,"launch_angle":-24.2,"distance":8.0},{"x":271.1,"y":189.3,"category":"Single","result":"Single","exit_velocity":80.3,"launch_angle":13.8,"distance":187.0},{"x":346.7,"y":325.9,"category":"Triple","result":"Triple","exit_velocity":95.9,"launch_angle":24.0,"distance":367.0},{"x":224.2,"y":215.8,"category":"Single","result":"Single","exit_velocity":106.9,"launch_angle":13.5,"distance":231.0},{"x":279.0,"y":42.8,"category":"Out","result":"Out","exit_velocity":67.1,"launch_angle":-64.7,"distance":4.0},{"x":133.7,"y":221.1,"category":"Out","result":"Sacrifice","exit_velocity":94.9,"launch_angle":50.0,"distance":291.0},{"x":346.4,"y":242.1,"category":"Out","result":"Out","exit_velocity":78.2,"launch_angle":36.8,"distance":266.0},{"x":280.5,"y":54.0,"category":"Out","result":"Out","exit_velocity":95.7,"launch_angle":-9.0,"distance":17.0},{"x":276.0,"y":44.5,"category":"Out","result":"Out","exit_velocity":75.3,"launch_angle":-23.6,"distance":8.0},{"x":328.6,"y":299.6,"category":"Out","result":"Out","exit_velocity":92.5,"launch_angle":22.6,"distance":330.0},{"x":150.4,"y":260.2,"category":"Out","result":"Out","exit_velocity":84.8,"launch_angle":32.0,"distance":319.0},{"x":282.6,"y":44.1,"category":"Out","result":"Out","exit_velocity":80.0,"launch_angle":-24.7,"distance":6.0},{"x":285.3,"y":333.4,"category":"Out","result":"Out","exit_velocity":92.9,"launch_angle":30.4,"distance":367.0},{"x":276.8,"y":42.1,"category":"Out","result":"FieldersChoice","exit_velocity":71.6,"launch_angle":-46.5,"distance":5.0},{"x":291.8,"y":76.1,"category":"Single","result":"Single","exit_velocity":102.7,"launch_angle":-0.4,"distance":47.0},{"x":275.2,"y":53.4,"category":"Out","result":"Out","exit_velocity":84.6,"launch_angle":-9.5,"distance":18.0},{"x":273.3,"y":50.4,"category":"Single","result":"Single","exit_velocity":98.0,"launch_angle":-10.5,"distance":15.0},{"x":276.3,"y":177.8,"category":"Out","result":"Out","exit_velocity":64.9,"launch_angle":53.7,"distance":172.0},{"x":219.4,"y":172.4,"category":"Single","result":"Single","exit_velocity":86.3,"launch_angle":15.2,"distance":182.0},{"x":360.2,"y":255.8,"category":"Out","result":"Out","exit_velocity":87.8,"launch_angle":45.7,"distance":288.0},{"x":264.7,"y":90.7,"category":"Out","result":"Out","exit_velocity":99.6,"launch_angle":2.0,"distance":66.0},{"x":329.8,"y":212.2,"category":"Single","result":"Single","exit_velocity":79.3,"launch_angle":18.3,"distance":224.0},{"x":283.2,"y":128.5,"category":"Out","result":"Out","exit_velocity":86.1,"launch_angle":6.0,"distance":111.0},{"x":263.5,"y":229.7,"category":"Out","result":"Out","exit_velocity":73.1,"launch_angle":42.6,"distance":238.0},{"x":256.6,"y":114.0,"category":"Out","result":"Out","exit_velocity":94.5,"launch_angle":5.6,"distance":97.0},{"x":278.0,"y":42.9,"category":"Out","result":"Out","exit_velocity":54.7,"launch_angle":-39.6,"distance":4.0},{"x":211.2,"y":351.2,"category":"HomeRun","result":"HomeRun","exit_velocity":99.7,"launch_angle":28.1,"distance":398.0},{"x":316.2,"y":301.9,"category":"Out","result":"Out","exit_velocity":88.4,"launch_angle":29.0,"distance":330.0},{"x":249.3,"y":87.5,"category":"Out","result":"Out","exit_velocity":101.7,"launch_angle":0.0,"distance":71.0},{"x":211.5,"y":243.1,"category":"Single","result":"Single","exit_velocity":101.7,"launch_angle":18.8,"distance":268.0},{"x":220.6,"y":166.6,"category":"Out","result":"Out","exit_velocity":60.5,"launch_angle":41.5,"distance":175.0},{"x":314.8,"y":241.3,"category":"Single","result":"Single","exit_velocity":85.0,"launch_angle":17.7,"distance":255.0},{"x":276.1,"y":51.8,"category":"Out","result":"Out","exit_velocity":100.9,"launch_angle":-10.6,"distance":16.0},{"x":249.6,"y":347.5,"category":"Out","result":"Out","exit_velocity":97.0,"launch_angle":29.1,"distance":386.0},{"x":207.8,"y":144.4,"category":"Out","result":"Out","exit_velocity":92.5,"launch_angle":8.5,"distance":159.0},{"x":270.5,"y":95.4,"category":"Out","result":"Error","exit_velocity":97.9,"launch_angle":2.7,"distance":70.0},{"x":368.9,"y":234.1,"category":"Out","result":"Out","exit_velocity":81.2,"launch_angle":44.8,"distance":267.0},{"x":354.8,"y":287.8,"category":"Out","result":"Out","exit_velocity":90.4,"launch_angle":31.8,"distance":324.0},{"x":285.0,"y":307.9,"category":"Out","result":"Out","exit_velocity":94.3,"launch_angle":23.3,"distance":335.0},{"x":359.6,"y":302.1,"category":"Single","result":"Single","exit_velocity":94.6,"launch_angle":23.4,"distance":342.0},{"x":242.9,"y":221.3,"category":"Single","result":"Single","exit_velocity":89.1,"launch_angle":12.8,"distance":231.0},{"x":287.2,"y":54.7,"category":"Out","result":"Out","exit_velocity":100.0,"launch_angle":-5.3,"distance":21.0},{"x":236.3,"y":179.7,"category":"Single","result":"Single","exit_velocity":101.6,"launch_angle":9.6,"distance":183.0},{"x":191.7,"y":309.3,"category":"Double","result":"Double","exit_velocity":95.0,"launch_angle":24.5,"distance":354.0}],"rolling_xslg":[{"x":1,"y":0.368},{"x":2,"y":0.307},{"x":3,"y":0.348},{"x":4,"y":0.379},{"x":5,"y":0.345},{"x":6,"y":0.318},{"x":7,"y":0.374},{"x":8,"y":0.421},{"x":9,"y":0.464},{"x":10,"y":0.501},{"x":11,"y":0.472},{"x":12,"y":0.447},{"x":13,"y":0.521},{"x":14,"y":0.587},{"x":15,"y":0.556},{"x":16,"y":0.528},{"x":17,"y":0.542},{"x":18,"y":0.554},{"x":19,"y":0.593},{"x":20,"y":0.602},{"x":21,"y":0.588},{"x":22,"y":0.594},{"x":23,"y":0.612},{"x":24,"y":0.591},{"x":25,"y":0.574},{"x":26,"y":0.611},{"x":27,"y":0.592},{"x":28,"y":0.584},{"x":29,"y":0.571},{"x":30,"y":0.605},{"x":31,"y":0.626},{"x":32,"y":0.627},{"x":33,"y":0.616},{"x":34,"y":0.616},{"x":35,"y":0.6},{"x":36,"y":0.585},{"x":37,"y":0.611},{"x":38,"y":0.621},{"x":39,"y":0.645},{"x":40,"y":0.63},{"x":41,"y":0.622},{"x":42,"y":0.641},{"x":43,"y":0.627},{"x":44,"y":0.623},{"x":45,"y":0.615},{"x":46,"y":0.607},{"x":47,"y":0.595},{"x":48,"y":0.584},{"x":49,"y":0.591},{"x":50,"y":0.598},{"x":51,"y":0.587},{"x":52,"y":0.576}],"trackman_team":"GRA_CAN","slg_con":0.576,"r":25,"rbi":32,"war_per_55":0.0311,"qab_count":65,"qab_pa":128,"qab_criteria":{"hit":34,"walk":7,"hbp":3,"sacrifice":3,"barrel":7,"eight_pitch":26,"battle_02":5},"qab_productive_out_available":false,"headshot":"gcu_player_assets/billy-scaldeferri-headshot.jpeg","header":"gcu_player_assets/billy-scaldeferri-header.webp","header_position":"50% 0%"},{"name":"Jake Sanko","csv":"Sanko, Jake","position":"2B","source_team":"GRA_CAN","pa":120,"ab":102,"pitches":416,"bats":"R","h":35,"1b":28,"2b":5,"3b":1,"hr":1,"xbh":7,"bb":12,"k":14,"hbp":3,"sac":3,"sb":5,"rbi_proxy":18,"avg":0.3431372549019608,"obp":0.4166666666666667,"slg":0.4411764705882353,"ops":0.857843137254902,"iso":0.0980392156862745,"woba":0.366,"wrc_plus_proxy":99,"walk_rate":0.1,"k_rate":0.11666666666666667,"bb_k":0.8571428571428571,"swing_rate":0.46875,"chase_rate":0.2857142857142857,"contact_rate":0.667,"zone_contact_rate":0.838,"whiff_rate":0.333,"avg_ev":86.6,"ev90":98.9,"hard_hit_pct":0.361,"barrel_pct":0.0,"ld_pct":0.194,"gb_pct":0.361,"fb_pct":0.444,"sweet_spot":0.333,"qab":0.525,"fpct":null,"status":"Tracked","avgDisplay":".343","obpDisplay":".417","slgDisplay":".441","opsDisplay":".858","isoDisplay":".098","wobaDisplay":".366","walkRateDisplay":"10.0%","kRateDisplay":"11.7%","bbKDisplay":"0.86","chaseRateDisplay":"28.6%","swingRateDisplay":"46.9%","contactRateDisplay":"82.6%","whiffRateDisplay":"17.4%","avgEvDisplay":"86.6","ev90Display":"101.2","hardHitDisplay":"36.1%","barrelDisplay":"0.0%","ldDisplay":"16.5%","gbDisplay":"51.6%","fbDisplay":"24.2%","sweetDisplay":"26.4%","qabDisplay":"52.5%","fpctDisplay":"--","wrcPlusDisplay":"99","ops_plus":95,"opsPlusDisplay":"95","war":1.73,"owar":1.12,"drs":8.2,"defensive_runs_saved":8.2,"framing_runs_saved":0.0,"pitches_framed":0,"stolen_base_runs":0.0,"pickoff_runs":0.0,"throwing_runs":0.0,"infield_gb_runs":6.84,"double_play_runs_start":0.3,"double_play_runs_pivot":0.79,"infield_fb_runs":0.09,"bunt_runs":0.18,"outfield_fb_runs":0.0,"outfield_arm_runs":0.0,"blocking_runs":0.0,"fld_po":57,"fld_a":111,"fld_e":6,"fld_pct":0.966,"fld_idp":17,"fld_pb":null,"synergy_pos":"2B","trackman_bbe":36,"spray_points":[{"x":245.9,"y":229.5,"category":"Single","result":"Single","exit_velocity":71.5,"launch_angle":32.2,"distance":241.0},{"x":309.2,"y":310.0,"category":"Out","result":"Out","exit_velocity":93.8,"launch_angle":27.6,"distance":339.0},{"x":397.3,"y":205.6,"category":"Out","result":"Out","exit_velocity":79.3,"launch_angle":40.7,"distance":254.0},{"x":280.9,"y":105.5,"category":"Single","result":"Single","exit_velocity":88.6,"launch_angle":5.4,"distance":82.0},{"x":313.5,"y":315.1,"category":"Out","result":"Out","exit_velocity":93.1,"launch_angle":37.0,"distance":346.0},{"x":242.8,"y":98.2,"category":"Single","result":"Single","exit_velocity":99.4,"launch_angle":4.9,"distance":86.0},{"x":202.5,"y":242.6,"category":"Single","result":"Single","exit_velocity":97.3,"launch_angle":17.5,"distance":271.0},{"x":281.6,"y":43.5,"category":"Out","result":"Out","exit_velocity":75.9,"launch_angle":-25.0,"distance":5.0},{"x":178.0,"y":193.1,"category":"Single","result":"Single","exit_velocity":96.4,"launch_angle":13.8,"distance":230.0},{"x":223.8,"y":201.7,"category":"Single","result":"Single","exit_velocity":64.5,"launch_angle":34.0,"distance":214.0},{"x":317.2,"y":85.0,"category":"Double","result":"Double","exit_velocity":71.8,"launch_angle":4.4,"distance":73.0},{"x":201.4,"y":139.1,"category":"Double","result":"Double","exit_velocity":88.8,"launch_angle":11.3,"distance":158.0},{"x":283.3,"y":51.3,"category":"Out","result":"Out","exit_velocity":75.4,"launch_angle":-5.1,"distance":15.0},{"x":266.5,"y":55.4,"category":"Out","result":"Error","exit_velocity":74.3,"launch_angle":-5.1,"distance":26.0},{"x":278.3,"y":50.7,"category":"Single","result":"Single","exit_velocity":86.0,"launch_angle":-12.9,"distance":14.0},{"x":276.7,"y":90.2,"category":"Single","result":"Single","exit_velocity":97.2,"launch_angle":1.5,"distance":63.0},{"x":275.8,"y":50.5,"category":"Out","result":"Out","exit_velocity":96.3,"launch_angle":-10.6,"distance":14.0},{"x":392.7,"y":270.8,"category":"Out","result":"Sacrifice","exit_velocity":91.4,"launch_angle":40.5,"distance":321.0},{"x":278.9,"y":44.1,"category":"Out","result":"Out","exit_velocity":75.5,"launch_angle":-33.3,"distance":5.0},{"x":264.5,"y":229.9,"category":"Single","result":"Single","exit_velocity":69.4,"launch_angle":32.2,"distance":238.0},{"x":248.5,"y":291.8,"category":"Single","result":"Single","exit_velocity":96.1,"launch_angle":21.3,"distance":317.0},{"x":208.2,"y":264.7,"category":"Single","result":"Single","exit_velocity":96.6,"launch_angle":16.9,"distance":295.0},{"x":281.7,"y":68.4,"category":"Out","result":"Out","exit_velocity":79.0,"launch_angle":-0.6,"distance":36.0},{"x":314.8,"y":205.7,"category":"Single","result":"Single","exit_velocity":66.8,"launch_angle":37.5,"distance":212.0},{"x":296.3,"y":104.9,"category":"Out","result":"Out","exit_velocity":99.4,"launch_angle":3.7,"distance":84.0},{"x":254.2,"y":134.5,"category":"Out","result":"Out","exit_velocity":52.2,"launch_angle":21.8,"distance":122.0},{"x":327.9,"y":201.3,"category":"Single","result":"Single","exit_velocity":98.4,"launch_angle":10.8,"distance":210.0},{"x":223.2,"y":135.4,"category":"Out","result":"Out","exit_velocity":85.1,"launch_angle":9.3,"distance":139.0},{"x":301.0,"y":101.7,"category":"Single","result":"Single","exit_velocity":104.0,"launch_angle":2.4,"distance":82.0},{"x":276.2,"y":51.0,"category":"Out","result":"Out","exit_velocity":95.2,"launch_angle":-8.9,"distance":15.0},{"x":239.5,"y":107.3,"category":"Out","result":"Out","exit_velocity":102.8,"launch_angle":5.3,"distance":98.0},{"x":290.0,"y":296.1,"category":"Out","result":"Out","exit_velocity":94.8,"launch_angle":41.1,"distance":320.0},{"x":295.3,"y":311.1,"category":"Out","result":"Out","exit_velocity":96.5,"launch_angle":27.1,"distance":339.0},{"x":202.4,"y":245.4,"category":"Out","result":"Out","exit_velocity":80.3,"launch_angle":41.2,"distance":275.0},{"x":233.1,"y":105.3,"category":"Out","result":"Out","exit_velocity":92.7,"launch_angle":6.4,"distance":100.0},{"x":415.6,"y":279.5,"category":"Double","result":"Double","exit_velocity":93.6,"launch_angle":27.6,"distance":344.0},{"x":282.4,"y":129.1,"category":"Single","result":"Single","exit_velocity":101.7,"launch_angle":4.4,"distance":111.0},{"x":340.1,"y":244.5,"category":"Out","result":"Out","exit_velocity":80.1,"launch_angle":43.3,"distance":266.0},{"x":231.7,"y":301.4,"category":"Double","result":"Double","exit_velocity":103.3,"launch_angle":19.4,"distance":332.0},{"x":288.5,"y":213.6,"category":"Single","result":"Single","exit_velocity":84.0,"launch_angle":17.6,"distance":217.0},{"x":248.4,"y":318.2,"category":"Out","result":"Out","exit_velocity":94.4,"launch_angle":23.9,"distance":350.0},{"x":279.3,"y":42.9,"category":"Out","result":"Out","exit_velocity":46.9,"launch_angle":-50.2,"distance":4.0},{"x":246.7,"y":97.4,"category":"Single","result":"Single","exit_velocity":102.7,"launch_angle":3.6,"distance":83.0},{"x":209.8,"y":154.9,"category":"Single","result":"Single","exit_velocity":105.6,"launch_angle":10.0,"distance":168.0},{"x":264.9,"y":318.8,"category":"Out","result":"Out","exit_velocity":90.9,"launch_angle":27.2,"distance":349.0},{"x":261.7,"y":215.9,"category":"Single","result":"Single","exit_velocity":87.5,"launch_angle":13.4,"distance":221.0},{"x":333.8,"y":122.4,"category":"Single","result":"Single","exit_velocity":78.2,"launch_angle":8.7,"distance":123.0},{"x":276.8,"y":44.5,"category":"Out","result":"FieldersChoice","exit_velocity":81.5,"launch_angle":-25.7,"distance":7.0},{"x":275.7,"y":45.7,"category":"Out","result":"Out","exit_velocity":63.0,"launch_angle":-14.5,"distance":9.0},{"x":282.3,"y":43.0,"category":"Single","result":"Single","exit_velocity":33.0,"launch_angle":-54.7,"distance":5.0},{"x":277.4,"y":45.9,"category":"Out","result":"Sacrifice","exit_velocity":33.1,"launch_angle":-29.6,"distance":8.0},{"x":285.2,"y":121.1,"category":"Single","result":"Single","exit_velocity":90.1,"launch_angle":5.8,"distance":102.0},{"x":281.1,"y":44.9,"category":"Out","result":"Out","exit_velocity":74.4,"launch_angle":-17.0,"distance":6.0},{"x":277.5,"y":43.3,"category":"Single","result":"Single","exit_velocity":60.5,"launch_angle":-42.2,"distance":5.0},{"x":277.9,"y":41.8,"category":"Out","result":"Out","exit_velocity":80.4,"launch_angle":-34.0,"distance":4.0},{"x":375.3,"y":187.9,"category":"Double","result":"Double","exit_velocity":96.6,"launch_angle":11.6,"distance":220.0},{"x":294.7,"y":124.1,"category":"Out","result":"Out","exit_velocity":97.8,"launch_angle":4.8,"distance":107.0},{"x":210.8,"y":216.0,"category":"Out","result":"Out","exit_velocity":92.0,"launch_angle":59.3,"distance":236.0},{"x":143.7,"y":304.8,"category":"HomeRun","result":"HomeRun","exit_velocity":96.5,"launch_angle":33.2,"distance":372.0},{"x":334.0,"y":301.0,"category":"Out","result":"Out","exit_velocity":91.8,"launch_angle":32.1,"distance":333.0},{"x":278.0,"y":51.3,"category":"Out","result":"Out","exit_velocity":87.3,"launch_angle":-4.9,"distance":14.0},{"x":344.1,"y":299.4,"category":"Out","result":"Out","exit_velocity":94.9,"launch_angle":20.9,"distance":334.0},{"x":277.3,"y":48.5,"category":"Out","result":"Out","exit_velocity":70.0,"launch_angle":-8.3,"distance":11.0},{"x":276.6,"y":52.8,"category":"Out","result":"Out","exit_velocity":77.4,"launch_angle":-4.8,"distance":17.0},{"x":239.4,"y":300.8,"category":"Out","result":"Out","exit_velocity":96.1,"launch_angle":42.2,"distance":330.0},{"x":187.8,"y":246.7,"category":"Out","result":"Out","exit_velocity":96.0,"launch_angle":49.9,"distance":283.0},{"x":278.7,"y":55.0,"category":"Single","result":"Single","exit_velocity":103.7,"launch_angle":-4.9,"distance":19.0},{"x":276.8,"y":42.7,"category":"Out","result":"Out","exit_velocity":62.9,"launch_angle":-35.9,"distance":5.0},{"x":237.2,"y":287.7,"category":"Out","result":"Out","exit_velocity":101.1,"launch_angle":18.7,"distance":314.0},{"x":264.4,"y":92.7,"category":"Out","result":"Out","exit_velocity":103.7,"launch_angle":2.6,"distance":69.0},{"x":262.8,"y":75.1,"category":"Single","result":"Single","exit_velocity":90.1,"launch_angle":1.1,"distance":49.0},{"x":234.0,"y":184.9,"category":"Out","result":"Out","exit_velocity":69.0,"launch_angle":52.4,"distance":190.0},{"x":270.7,"y":168.8,"category":"Out","result":"Out","exit_velocity":89.4,"launch_angle":62.5,"distance":161.0},{"x":278.6,"y":53.4,"category":"Single","result":"Single","exit_velocity":94.6,"launch_angle":-9.0,"distance":17.0},{"x":257.7,"y":267.5,"category":"Single","result":"Single","exit_velocity":96.2,"launch_angle":17.0,"distance":286.0},{"x":279.3,"y":339.3,"category":"Out","result":"Sacrifice","exit_velocity":95.7,"launch_angle":25.7,"distance":374.0},{"x":204.9,"y":362.8,"category":"Triple","result":"Triple","exit_velocity":100.7,"launch_angle":28.0,"distance":414.0},{"x":283.7,"y":61.5,"category":"Out","result":"Out","exit_velocity":92.8,"launch_angle":-2.7,"distance":27.0},{"x":267.3,"y":109.1,"category":"Out","result":"Out","exit_velocity":63.3,"launch_angle":70.3,"distance":88.0},{"x":282.0,"y":303.7,"category":"Out","result":"Out","exit_velocity":93.7,"launch_angle":39.3,"distance":330.0},{"x":277.9,"y":44.9,"category":"Out","result":"Error","exit_velocity":77.2,"launch_angle":-12.9,"distance":7.0},{"x":268.4,"y":62.0,"category":"Out","result":"Out","exit_velocity":88.8,"launch_angle":-1.4,"distance":31.0},{"x":263.3,"y":107.7,"category":"Out","result":"Out","exit_velocity":76.6,"launch_angle":7.1,"distance":87.0},{"x":279.3,"y":41.2,"category":"Out","result":"Out","exit_velocity":72.2,"launch_angle":-59.0,"distance":2.0},{"x":324.5,"y":151.0,"category":"Single","result":"Single","exit_velocity":95.7,"launch_angle":6.1,"distance":149.0},{"x":270.9,"y":164.0,"category":"Out","result":"Out","exit_velocity":67.4,"launch_angle":57.2,"distance":155.0},{"x":269.7,"y":72.7,"category":"Out","result":"Out","exit_velocity":101.6,"launch_angle":-0.1,"distance":43.0},{"x":248.4,"y":84.5,"category":"Out","result":"FieldersChoice","exit_velocity":93.7,"launch_angle":0.6,"distance":68.0}],"rolling_xslg":[{"x":1,"y":0.824},{"x":2,"y":0.718},{"x":3,"y":0.68},{"x":4,"y":0.659},{"x":5,"y":0.673},{"x":6,"y":0.605},{"x":7,"y":0.621},{"x":8,"y":0.626},{"x":9,"y":0.594},{"x":10,"y":0.585},{"x":11,"y":0.556},{"x":12,"y":0.533},{"x":13,"y":0.505},{"x":14,"y":0.527},{"x":15,"y":0.548},{"x":16,"y":0.56},{"x":17,"y":0.534},{"x":18,"y":0.532},{"x":19,"y":0.53},{"x":20,"y":0.537},{"x":21,"y":0.544},{"x":22,"y":0.534},{"x":23,"y":0.548},{"x":24,"y":0.532},{"x":25,"y":0.544},{"x":26,"y":0.534},{"x":27,"y":0.556},{"x":28,"y":0.577},{"x":29,"y":0.563},{"x":30,"y":0.55},{"x":31,"y":0.541},{"x":32,"y":0.532}],"trackman_team":"GRA_CAN","slg_con":0.532,"r":26,"rbi":23,"war_per_55":0.0315,"qab_count":63,"qab_pa":120,"qab_criteria":{"hit":34,"walk":12,"hbp":3,"sacrifice":3,"barrel":1,"eight_pitch":21,"battle_02":8},"qab_productive_out_available":false,"headshot":"gcu_player_assets/jake-sanko-headshot.jpeg","header":"gcu_player_assets/jake-sanko-header.webp","header_position":"50.0% 12.4%"},{"name":"Camden Bates","csv":"Bates, Camden","position":"SS","source_team":"GRA_CAN","pa":64,"ab":44,"pitches":231,"bats":"R","h":16,"1b":12,"2b":3,"3b":0,"hr":1,"xbh":4,"bb":9,"k":6,"hbp":6,"sac":5,"sb":7,"rbi_proxy":8,"avg":0.36363636363636365,"obp":0.484375,"slg":0.5,"ops":0.984375,"iso":0.13636363636363635,"woba":0.365,"wrc_plus_proxy":99,"walk_rate":0.140625,"k_rate":0.09375,"bb_k":1.5,"swing_rate":0.42857142857142855,"chase_rate":0.2814814814814815,"contact_rate":0.615,"zone_contact_rate":0.778,"whiff_rate":0.385,"avg_ev":79.6,"ev90":98.4,"hard_hit_pct":0.267,"barrel_pct":0.0,"ld_pct":0.333,"gb_pct":0.333,"fb_pct":0.333,"sweet_spot":0.4,"qab":0.672,"fpct":null,"status":"Tracked","avgDisplay":".364","obpDisplay":".484","slgDisplay":".500","opsDisplay":".984","isoDisplay":".136","wobaDisplay":".365","walkRateDisplay":"14.1%","kRateDisplay":"9.4%","bbKDisplay":"1.50","chaseRateDisplay":"28.1%","swingRateDisplay":"42.9%","contactRateDisplay":"83.8%","whiffRateDisplay":"16.2%","avgEvDisplay":"79.6","ev90Display":"98.7","hardHitDisplay":"26.7%","barrelDisplay":"0.0%","ldDisplay":"27.9%","gbDisplay":"46.5%","fbDisplay":"16.3%","sweetDisplay":"37.2%","qabDisplay":"67.2%","fpctDisplay":"--","wrcPlusDisplay":"99","ops_plus":101,"opsPlusDisplay":"101","war":0.94,"owar":0.8,"drs":2.0,"defensive_runs_saved":2.0,"framing_runs_saved":0.0,"pitches_framed":0,"stolen_base_runs":0.0,"pickoff_runs":0.0,"throwing_runs":0.0,"infield_gb_runs":0.56,"double_play_runs_start":0.45,"double_play_runs_pivot":0.95,"infield_fb_runs":0.03,"bunt_runs":0.0,"outfield_fb_runs":0.0,"outfield_arm_runs":0.0,"blocking_runs":0.0,"fld_po":34,"fld_a":65,"fld_e":7,"fld_pct":0.934,"fld_idp":17,"fld_pb":null,"synergy_pos":"SS","trackman_bbe":15,"spray_points":[{"x":192.8,"y":233.1,"category":"Single","result":"Single","exit_velocity":98.9,"launch_angle":15.8,"distance":265.0},{"x":317.5,"y":236.0,"category":"Out","result":"Out","exit_velocity":86.3,"launch_angle":53.0,"distance":249.0},{"x":274.7,"y":174.7,"category":"Single","result":"Single","exit_velocity":77.3,"launch_angle":13.4,"distance":168.0},{"x":284.2,"y":63.7,"category":"Out","result":"Out","exit_velocity":70.0,"launch_angle":-2.2,"distance":30.0},{"x":275.4,"y":56.3,"category":"Out","result":"Out","exit_velocity":97.6,"launch_angle":-2.5,"distance":21.0},{"x":278.1,"y":52.7,"category":"Out","result":"Sacrifice","exit_velocity":24.2,"launch_angle":-1.9,"distance":16.0},{"x":194.7,"y":174.3,"category":"Double","result":"Double","exit_velocity":86.4,"launch_angle":15.2,"distance":199.0},{"x":285.5,"y":65.1,"category":"Out","result":"Sacrifice","exit_velocity":22.6,"launch_angle":25.4,"distance":32.0},{"x":253.9,"y":87.0,"category":"Out","result":"Out","exit_velocity":69.5,"launch_angle":6.3,"distance":67.0},{"x":229.2,"y":235.9,"category":"Single","result":"Single","exit_velocity":96.5,"launch_angle":12.8,"distance":253.0},{"x":235.5,"y":90.7,"category":"Double","result":"Double","exit_velocity":90.3,"launch_angle":5.0,"distance":84.0},{"x":278.8,"y":44.2,"category":"Out","result":"Out","exit_velocity":84.2,"launch_angle":-23.3,"distance":5.0},{"x":261.5,"y":244.6,"category":"Single","result":"Single","exit_velocity":87.8,"launch_angle":16.6,"distance":257.0},{"x":278.3,"y":48.9,"category":"Out","result":"Out","exit_velocity":90.9,"launch_angle":-16.8,"distance":11.0},{"x":285.3,"y":47.0,"category":"Out","result":"Out","exit_velocity":94.4,"launch_angle":-14.6,"distance":11.0},{"x":199.0,"y":254.5,"category":"Out","result":"Out","exit_velocity":81.2,"launch_angle":37.2,"distance":287.0},{"x":216.9,"y":138.5,"category":"Out","result":"Out","exit_velocity":97.3,"launch_angle":7.0,"distance":146.0},{"x":276.1,"y":45.0,"category":"Out","result":"Error","exit_velocity":80.5,"launch_angle":-21.0,"distance":8.0},{"x":214.1,"y":117.0,"category":"Double","result":"Double","exit_velocity":57.7,"launch_angle":19.4,"distance":127.0},{"x":266.3,"y":204.2,"category":"Single","result":"Single","exit_velocity":81.1,"launch_angle":16.8,"distance":206.0},{"x":280.9,"y":42.0,"category":"Out","result":"Out","exit_velocity":44.0,"launch_angle":-53.6,"distance":3.0},{"x":280.6,"y":43.7,"category":"Out","result":"Out","exit_velocity":77.8,"launch_angle":-25.1,"distance":5.0},{"x":250.3,"y":233.7,"category":"Single","result":"Single","exit_velocity":98.8,"launch_angle":11.7,"distance":245.0},{"x":176.9,"y":205.2,"category":"Out","result":"Out","exit_velocity":80.4,"launch_angle":51.7,"distance":243.0},{"x":229.6,"y":148.0,"category":"Single","result":"Single","exit_velocity":87.0,"launch_angle":9.4,"distance":149.0},{"x":278.7,"y":39.7,"category":"Single","result":"Single","exit_velocity":73.7,"launch_angle":-64.4,"distance":2.0},{"x":281.2,"y":51.8,"category":"Out","result":"Sacrifice","exit_velocity":18.7,"launch_angle":0.6,"distance":15.0},{"x":383.9,"y":270.5,"category":"Out","result":"Sacrifice","exit_velocity":91.5,"launch_angle":21.0,"distance":316.0},{"x":180.6,"y":309.1,"category":"HomeRun","result":"HomeRun","exit_velocity":100.2,"launch_angle":28.0,"distance":359.0},{"x":264.0,"y":85.9,"category":"Single","result":"Single","exit_velocity":100.6,"launch_angle":1.9,"distance":61.0},{"x":233.4,"y":306.9,"category":"Out","result":"Out","exit_velocity":95.1,"launch_angle":22.3,"distance":339.0},{"x":244.8,"y":103.8,"category":"Out","result":"Out","exit_velocity":86.1,"launch_angle":5.8,"distance":91.0},{"x":230.6,"y":255.3,"category":"Out","result":"Out","exit_velocity":81.6,"launch_angle":44.8,"distance":276.0},{"x":287.9,"y":324.7,"category":"Out","result":"Out","exit_velocity":94.0,"launch_angle":26.5,"distance":356.0},{"x":283.5,"y":53.8,"category":"Single","result":"Single","exit_velocity":87.5,"launch_angle":-10.1,"distance":18.0},{"x":270.4,"y":59.9,"category":"Single","result":"Single","exit_velocity":91.0,"launch_angle":-2.7,"distance":28.0},{"x":199.2,"y":272.9,"category":"Out","result":"Out","exit_velocity":94.5,"launch_angle":16.4,"distance":308.0},{"x":276.0,"y":44.6,"category":"Out","result":"Out","exit_velocity":80.0,"launch_angle":-22.4,"distance":8.0},{"x":275.9,"y":198.4,"category":"Single","result":"Single","exit_velocity":99.6,"launch_angle":8.0,"distance":198.0}],"rolling_xslg":[{"x":1,"y":0.505},{"x":2,"y":0.524},{"x":3,"y":0.46},{"x":4,"y":0.413},{"x":5,"y":0.398},{"x":6,"y":0.386},{"x":7,"y":0.402},{"x":8,"y":0.37},{"x":9,"y":0.341},{"x":10,"y":0.393},{"x":11,"y":0.385}],"trackman_team":"GRA_CAN","slg_con":0.385,"r":29,"rbi":20,"war_per_55":0.0171,"qab_count":43,"qab_pa":64,"qab_criteria":{"hit":16,"walk":9,"hbp":6,"sacrifice":5,"barrel":1,"eight_pitch":16,"battle_02":4},"qab_productive_out_available":false,"headshot":"gcu_player_assets/camden-bates-headshot.webp","header":"gcu_player_assets/camden-bates-header.webp","header_position":"50.0% 12.4%"},{"name":"Kolt Myers","csv":"Myers, Kolt","position":"SS","source_team":"FLA_GAT","pa":87,"ab":82,"pitches":336,"bats":"R","h":15,"1b":11,"2b":3,"3b":1,"hr":0,"xbh":4,"bb":4,"k":33,"hbp":0,"sac":1,"sb":6,"rbi_proxy":4,"avg":0.18292682926829268,"obp":0.21839080459770116,"slg":0.24390243902439024,"ops":0.4622932436220914,"iso":0.06097560975609756,"woba":0.223,"wrc_plus_proxy":17,"walk_rate":0.04597701149425287,"k_rate":0.3793103448275862,"bb_k":0.12121212121212122,"swing_rate":0.44047619047619047,"chase_rate":0.3027027027027027,"contact_rate":0.521,"zone_contact_rate":0.76,"whiff_rate":0.479,"avg_ev":82.2,"ev90":101.5,"hard_hit_pct":0.24,"barrel_pct":0.0,"ld_pct":0.2,"gb_pct":0.36,"fb_pct":0.44,"sweet_spot":0.44,"qab":0.402,"fpct":null,"status":"Transfer: FLA_GAT","avgDisplay":".183","obpDisplay":".218","slgDisplay":".244","opsDisplay":".462","isoDisplay":".061","wobaDisplay":".223","walkRateDisplay":"4.6%","kRateDisplay":"37.9%","bbKDisplay":"0.12","chaseRateDisplay":"30.3%","swingRateDisplay":"44.0%","contactRateDisplay":"70.9%","whiffRateDisplay":"29.1%","avgEvDisplay":"82.2","ev90Display":"101.7","hardHitDisplay":"24.0%","barrelDisplay":"0.0%","ldDisplay":"22.4%","gbDisplay":"55.1%","fbDisplay":"10.2%","sweetDisplay":"34.7%","qabDisplay":"40.2%","fpctDisplay":"--","wrcPlusDisplay":"17","ops_plus":16,"opsPlusDisplay":"16","war":0.29,"owar":-0.09,"drs":5.18,"defensive_runs_saved":5.18,"framing_runs_saved":0.0,"pitches_framed":0,"stolen_base_runs":0.0,"pickoff_runs":0.0,"throwing_runs":0.0,"infield_gb_runs":4.98,"double_play_runs_start":0.5,"double_play_runs_pivot":0.06,"infield_fb_runs":-0.32,"bunt_runs":-0.03,"outfield_fb_runs":0.0,"outfield_arm_runs":0.0,"blocking_runs":0.0,"fld_po":25,"fld_a":48,"fld_e":5,"fld_pct":0.936,"fld_idp":7,"fld_pb":null,"synergy_pos":"3B","trackman_bbe":25,"spray_points":[{"x":280.4,"y":79.2,"category":"Single","result":"Single","exit_velocity":92.4,"launch_angle":1.2,"distance":49.0},{"x":186.6,"y":300.2,"category":"Out","result":"Out","exit_velocity":92.2,"launch_angle":26.0,"distance":346.0},{"x":255.3,"y":299.6,"category":"Out","result":"Out","exit_velocity":89.7,"launch_angle":28.3,"distance":326.0},{"x":240.7,"y":240.9,"category":"Single","result":"Single","exit_velocity":102.1,"launch_angle":13.7,"distance":256.0},{"x":269.3,"y":77.6,"category":"Out","result":"Out","exit_velocity":68.6,"launch_angle":2.7,"distance":49.0},{"x":277.2,"y":40.8,"category":"Out","result":"Out","exit_velocity":66.2,"launch_angle":-38.7,"distance":4.0},{"x":262.8,"y":111.1,"category":"Out","result":"Out","exit_velocity":51.4,"launch_angle":16.0,"distance":91.0},{"x":410.9,"y":260.1,"category":"Double","result":"Double","exit_velocity":96.6,"launch_angle":25.1,"distance":320.0},{"x":273.2,"y":73.2,"category":"Single","result":"Single","exit_velocity":100.6,"launch_angle":-0.6,"distance":42.0},{"x":272.1,"y":77.6,"category":"Out","result":"Sacrifice","exit_velocity":27.8,"launch_angle":26.6,"distance":48.0},{"x":184.8,"y":181.9,"category":"Double","result":"Double","exit_velocity":103.0,"launch_angle":13.1,"distance":214.0},{"x":282.1,"y":45.6,"category":"Out","result":"Out","exit_velocity":76.6,"launch_angle":-17.9,"distance":7.0},{"x":274.1,"y":54.6,"category":"Out","result":"Out","exit_velocity":99.3,"launch_angle":-5.9,"distance":20.0},{"x":214.4,"y":150.4,"category":"Out","result":"Error","exit_velocity":94.9,"launch_angle":68.3,"distance":161.0},{"x":316.5,"y":203.7,"category":"Single","result":"Single","exit_velocity":91.0,"launch_angle":12.4,"distance":210.0},{"x":278.8,"y":44.5,"category":"Out","result":"FieldersChoice","exit_velocity":58.0,"launch_angle":-25.3,"distance":6.0},{"x":290.9,"y":60.5,"category":"Out","result":"Out","exit_velocity":62.9,"launch_angle":-0.0,"distance":29.0},{"x":295.4,"y":228.2,"category":"Single","result":"Single","exit_velocity":97.7,"launch_angle":11.2,"distance":236.0},{"x":381.3,"y":256.9,"category":"Out","result":"Out","exit_velocity":90.6,"launch_angle":44.2,"distance":299.0},{"x":271.0,"y":68.1,"category":"Out","result":"FieldersChoice","exit_velocity":94.5,"launch_angle":-0.8,"distance":37.0},{"x":229.8,"y":119.2,"category":"Out","result":"Out","exit_velocity":87.4,"launch_angle":69.0,"distance":117.0},{"x":251.5,"y":238.3,"category":"Double","result":"Double","exit_velocity":81.8,"launch_angle":36.1,"distance":250.0},{"x":294.0,"y":296.7,"category":"Out","result":"Out","exit_velocity":95.2,"launch_angle":31.5,"distance":321.0},{"x":278.8,"y":44.7,"category":"Out","result":"Out","exit_velocity":95.9,"launch_angle":-20.6,"distance":6.0},{"x":279.6,"y":39.8,"category":"Out","result":"Error","exit_velocity":72.3,"launch_angle":-72.8,"distance":1.0},{"x":214.3,"y":287.1,"category":"Single","result":"Single","exit_velocity":102.9,"launch_angle":17.1,"distance":320.0},{"x":279.2,"y":52.9,"category":"Single","result":"Single","exit_velocity":101.6,"launch_angle":-7.6,"distance":16.0},{"x":298.6,"y":248.1,"category":"Single","result":"Single","exit_velocity":102.3,"launch_angle":13.3,"distance":261.0},{"x":316.2,"y":263.3,"category":"Triple","result":"Triple","exit_velocity":103.2,"launch_angle":12.8,"distance":283.0},{"x":275.7,"y":60.2,"category":"Out","result":"Out","exit_velocity":94.2,"launch_angle":-5.7,"distance":26.0},{"x":279.9,"y":97.4,"category":"Out","result":"Out","exit_velocity":81.1,"launch_angle":3.1,"distance":72.0},{"x":271.1,"y":146.7,"category":"Out","result":"Out","exit_velocity":65.2,"launch_angle":59.6,"distance":134.0},{"x":279.6,"y":60.9,"category":"Single","result":"Single","exit_velocity":68.1,"launch_angle":-4.0,"distance":26.0},{"x":252.2,"y":110.3,"category":"Single","result":"Single","exit_velocity":92.6,"launch_angle":5.3,"distance":95.0},{"x":285.4,"y":281.9,"category":"Single","result":"Single","exit_velocity":101.0,"launch_angle":16.0,"distance":302.0},{"x":275.4,"y":55.3,"category":"Out","result":"Out","exit_velocity":76.5,"launch_angle":-7.6,"distance":20.0},{"x":276.8,"y":45.7,"category":"Out","result":"Error","exit_velocity":79.0,"launch_angle":-23.9,"distance":8.0},{"x":277.6,"y":47.1,"category":"Out","result":"Error","exit_velocity":92.0,"launch_angle":-13.2,"distance":9.0},{"x":281.9,"y":46.2,"category":"Out","result":"Out","exit_velocity":83.4,"launch_angle":-18.6,"distance":8.0},{"x":280.1,"y":39.7,"category":"Out","result":"Out","exit_velocity":77.3,"launch_angle":-89.4,"distance":0.0},{"x":278.5,"y":40.5,"category":"Out","result":"Out","exit_velocity":66.0,"launch_angle":-63.1,"distance":2.0},{"x":274.1,"y":80.4,"category":"Out","result":"Out","exit_velocity":28.2,"launch_angle":30.8,"distance":51.0},{"x":215.3,"y":275.9,"category":"Out","result":"Out","exit_velocity":94.9,"launch_angle":19.2,"distance":306.0},{"x":268.3,"y":80.6,"category":"Out","result":"Out","exit_velocity":85.5,"launch_angle":0.4,"distance":53.0},{"x":191.9,"y":312.2,"category":"Out","result":"Out","exit_velocity":92.8,"launch_angle":30.7,"distance":358.0},{"x":278.9,"y":49.6,"category":"Out","result":"Out","exit_velocity":88.5,"launch_angle":-11.5,"distance":12.0}],"rolling_xslg":[{"x":1,"y":0.736},{"x":2,"y":0.783},{"x":3,"y":0.696},{"x":4,"y":0.631},{"x":5,"y":0.674},{"x":6,"y":0.708},{"x":7,"y":0.643},{"x":8,"y":0.59},{"x":9,"y":0.544},{"x":10,"y":0.506},{"x":11,"y":0.481},{"x":12,"y":0.46},{"x":13,"y":0.464},{"x":14,"y":0.467},{"x":15,"y":0.506},{"x":16,"y":0.508},{"x":17,"y":0.536},{"x":18,"y":0.572},{"x":19,"y":0.547},{"x":20,"y":0.538},{"x":21,"y":0.521}],"trackman_team":"FLA_GAT","slg_con":0.521,"r":12,"rbi":3,"war_per_55":0.0053,"qab_count":35,"qab_pa":87,"qab_criteria":{"hit":15,"walk":4,"hbp":0,"sacrifice":1,"barrel":0,"eight_pitch":16,"battle_02":5},"qab_productive_out_available":false,"headshot":"gcu_player_assets/kolt-myers-headshot.png","header":"gcu_player_assets/kolt-myers-header.png","header_position":"50% 16%","header_size":"72% auto"},{"name":"Austin Owens","csv":"Owens, Austin","position":"SS","source_team":"GRA_CAN","pa":23,"ab":17,"pitches":97,"bats":"R","h":1,"1b":1,"2b":0,"3b":0,"hr":0,"xbh":0,"bb":4,"k":7,"hbp":2,"sac":0,"sb":2,"rbi_proxy":0,"avg":0.058823529411764705,"obp":0.30434782608695654,"slg":0.058823529411764705,"ops":0.36317135549872126,"iso":0.0,"woba":0.196,"wrc_plus_proxy":13,"walk_rate":0.17391304347826086,"k_rate":0.30434782608695654,"bb_k":0.5714285714285714,"swing_rate":0.28865979381443296,"chase_rate":0.12244897959183673,"contact_rate":0.778,"zone_contact_rate":1.0,"whiff_rate":0.222,"avg_ev":80.5,"ev90":94.674,"hard_hit_pct":0.0,"barrel_pct":0.0,"ld_pct":0.0,"gb_pct":0.571,"fb_pct":0.429,"sweet_spot":0.286,"qab":0.609,"fpct":null,"status":"Tracked","avgDisplay":".059","obpDisplay":".304","slgDisplay":".059","opsDisplay":".363","isoDisplay":".000","wobaDisplay":".196","walkRateDisplay":"17.4%","kRateDisplay":"30.4%","bbKDisplay":"0.57","chaseRateDisplay":"12.2%","swingRateDisplay":"28.9%","contactRateDisplay":"75.0%","whiffRateDisplay":"25.0%","avgEvDisplay":"80.5","ev90Display":"94.7","hardHitDisplay":"0.0%","barrelDisplay":"0.0%","ldDisplay":"20.0%","gbDisplay":"40.0%","fbDisplay":"40.0%","sweetDisplay":"40.0%","qabDisplay":"60.9%","fpctDisplay":"--","wrcPlusDisplay":"13","ops_plus":-22,"opsPlusDisplay":"-22","war":-0.12,"owar":-0.13,"drs":0.06,"defensive_runs_saved":0.06,"framing_runs_saved":0.0,"pitches_framed":0,"stolen_base_runs":0.0,"pickoff_runs":0.0,"throwing_runs":0.0,"infield_gb_runs":-0.06,"double_play_runs_start":0.07,"double_play_runs_pivot":0.05,"infield_fb_runs":0.0,"bunt_runs":0.0,"outfield_fb_runs":0.0,"outfield_arm_runs":0.0,"blocking_runs":0.0,"fld_po":7,"fld_a":20,"fld_e":1,"fld_pct":0.964,"fld_idp":2,"fld_pb":null,"synergy_pos":"SS","trackman_bbe":7,"spray_points":[{"x":191.1,"y":260.0,"category":"Out","result":"Out","exit_velocity":78.7,"launch_angle":32.0,"distance":297.0},{"x":290.8,"y":284.0,"category":"Out","result":"Out","exit_velocity":82.2,"launch_angle":29.4,"distance":305.0},{"x":234.4,"y":324.6,"category":"Out","result":"Out","exit_velocity":94.6,"launch_angle":29.8,"distance":360.0},{"x":279.4,"y":44.8,"category":"Out","result":"Out","exit_velocity":71.9,"launch_angle":-32.8,"distance":6.0},{"x":280.0,"y":44.0,"category":"Single","result":"Single","exit_velocity":49.6,"launch_angle":-63.6,"distance":5.0},{"x":286.3,"y":132.0,"category":"Out","result":"Out","exit_velocity":91.3,"launch_angle":5.7,"distance":115.0},{"x":277.2,"y":53.7,"category":"Out","result":"Out","exit_velocity":94.9,"launch_angle":-9.5,"distance":17.0},{"x":208.7,"y":297.3,"category":"Out","result":"Out","exit_velocity":89.5,"launch_angle":30.6,"distance":334.0},{"x":333.3,"y":262.8,"category":"Out","result":"Out","exit_velocity":86.7,"launch_angle":47.6,"distance":286.0},{"x":242.4,"y":294.5,"category":"Out","result":"Out","exit_velocity":93.1,"launch_angle":21.6,"distance":322.0}],"rolling_xslg":[{"x":1,"y":0.631},{"x":2,"y":0.552},{"x":3,"y":0.485}],"trackman_team":"GRA_CAN","slg_con":0.485,"r":1,"rbi":0,"war_per_55":-0.0022,"qab_count":14,"qab_pa":23,"qab_criteria":{"hit":1,"walk":4,"hbp":2,"sacrifice":0,"barrel":0,"eight_pitch":9,"battle_02":2},"qab_productive_out_available":false,"headshot":"gcu_player_assets/austin-owens-headshot.webp","header":"gcu_player_assets/austin-owens-header.webp","header_position":"50.0% 3.3%"},{"name":"Griffin Cameron","csv":"Cameron, Griffin","position":"OF","source_team":"GRA_CAN","pa":87,"ab":71,"pitches":310,"bats":"L","h":20,"1b":16,"2b":3,"3b":0,"hr":1,"xbh":4,"bb":9,"k":15,"hbp":3,"sac":4,"sb":6,"rbi_proxy":16,"avg":0.28169014084507044,"obp":0.367816091954023,"slg":0.36619718309859156,"ops":0.7340132750526145,"iso":0.08450704225352113,"woba":0.344,"wrc_plus_proxy":88,"walk_rate":0.10344827586206896,"k_rate":0.1724137931034483,"bb_k":0.6,"swing_rate":0.45161290322580644,"chase_rate":0.25,"contact_rate":0.706,"zone_contact_rate":0.814,"whiff_rate":0.294,"avg_ev":83.9,"ev90":99.8,"hard_hit_pct":0.364,"barrel_pct":0.0,"ld_pct":0.273,"gb_pct":0.606,"fb_pct":0.121,"sweet_spot":0.364,"qab":0.54,"fpct":null,"status":"Tracked","avgDisplay":".282","obpDisplay":".368","slgDisplay":".366","opsDisplay":".734","isoDisplay":".085","wobaDisplay":".344","walkRateDisplay":"10.3%","kRateDisplay":"17.2%","bbKDisplay":"0.60","chaseRateDisplay":"25.0%","swingRateDisplay":"45.2%","contactRateDisplay":"80.7%","whiffRateDisplay":"19.3%","avgEvDisplay":"83.9","ev90Display":"99.0","hardHitDisplay":"36.4%","barrelDisplay":"0.0%","ldDisplay":"28.3%","gbDisplay":"48.3%","fbDisplay":"20.0%","sweetDisplay":"31.7%","qabDisplay":"54.0%","fpctDisplay":"--","wrcPlusDisplay":"88","ops_plus":82,"opsPlusDisplay":"82","war":0.58,"owar":0.78,"drs":-2.69,"defensive_runs_saved":-2.69,"framing_runs_saved":0.0,"pitches_framed":0,"stolen_base_runs":0.0,"pickoff_runs":0.0,"throwing_runs":0.0,"infield_gb_runs":0.0,"double_play_runs_start":0.0,"double_play_runs_pivot":0.0,"infield_fb_runs":0.0,"bunt_runs":0.0,"outfield_fb_runs":-3.34,"outfield_arm_runs":0.65,"blocking_runs":0.0,"fld_po":111,"fld_a":3,"fld_e":1,"fld_pct":0.991,"fld_idp":null,"fld_pb":null,"synergy_pos":"CF","trackman_bbe":33,"spray_points":[{"x":227.0,"y":262.6,"category":"Out","result":"Out","exit_velocity":95.0,"launch_angle":17.3,"distance":286.0},{"x":237.4,"y":312.1,"category":"Double","result":"Double","exit_velocity":100.2,"launch_angle":19.8,"distance":344.0},{"x":261.4,"y":107.2,"category":"Single","result":"Single","exit_velocity":99.8,"launch_angle":4.0,"distance":87.0},{"x":285.6,"y":104.9,"category":"Single","result":"Single","exit_velocity":88.3,"launch_angle":4.4,"distance":81.0},{"x":273.8,"y":173.9,"category":"Out","result":"Out","exit_velocity":82.1,"launch_angle":12.3,"distance":168.0},{"x":283.4,"y":56.1,"category":"Out","result":"Out","exit_velocity":90.6,"launch_angle":-6.8,"distance":21.0},{"x":285.7,"y":57.9,"category":"Out","result":"FieldersChoice","exit_velocity":95.4,"launch_angle":-6.6,"distance":23.0},{"x":293.4,"y":226.1,"category":"Single","result":"Single","exit_velocity":83.9,"launch_angle":15.9,"distance":233.0},{"x":284.9,"y":56.0,"category":"Out","result":"Out","exit_velocity":69.4,"launch_angle":-3.9,"distance":21.0},{"x":282.1,"y":50.7,"category":"Out","result":"Out","exit_velocity":88.6,"launch_angle":-9.6,"distance":14.0},{"x":289.4,"y":172.9,"category":"Single","result":"Single","exit_velocity":92.8,"launch_angle":11.9,"distance":167.0},{"x":268.4,"y":261.7,"category":"Out","result":"Out","exit_velocity":86.5,"launch_angle":48.7,"distance":277.0},{"x":284.6,"y":133.8,"category":"Single","result":"Single","exit_velocity":95.7,"launch_angle":6.7,"distance":117.0},{"x":282.1,"y":46.1,"category":"Out","result":"Out","exit_velocity":68.2,"launch_angle":-15.5,"distance":8.0},{"x":323.6,"y":178.4,"category":"Out","result":"Out","exit_velocity":99.8,"launch_angle":8.7,"distance":181.0},{"x":282.2,"y":40.3,"category":"Out","result":"Out","exit_velocity":62.5,"launch_angle":-55.0,"distance":3.0},{"x":162.5,"y":268.4,"category":"Out","result":"Out","exit_velocity":92.5,"launch_angle":42.3,"distance":321.0},{"x":297.7,"y":80.3,"category":"Out","result":"Out","exit_velocity":89.9,"launch_angle":2.3,"distance":55.0},{"x":338.8,"y":228.9,"category":"Single","result":"Single","exit_velocity":94.7,"launch_angle":13.0,"distance":247.0},{"x":282.2,"y":49.5,"category":"Out","result":"Out","exit_velocity":66.3,"launch_angle":-11.3,"distance":12.0},{"x":282.7,"y":41.9,"category":"Out","result":"Out","exit_velocity":65.0,"launch_angle":-45.9,"distance":4.0},{"x":283.0,"y":41.8,"category":"Out","result":"Out","exit_velocity":70.3,"launch_angle":-58.1,"distance":4.0},{"x":219.9,"y":333.0,"category":"Out","result":"Out","exit_velocity":95.6,"launch_angle":26.8,"distance":374.0},{"x":281.2,"y":43.9,"category":"Out","result":"Out","exit_velocity":29.0,"launch_angle":-37.9,"distance":5.0},{"x":204.5,"y":243.1,"category":"Out","result":"Out","exit_velocity":89.8,"launch_angle":25.9,"distance":271.0},{"x":276.0,"y":51.6,"category":"Out","result":"Out","exit_velocity":87.7,"launch_angle":-9.9,"distance":15.0},{"x":410.8,"y":293.2,"category":"Out","result":"Out","exit_velocity":94.2,"launch_angle":36.3,"distance":356.0},{"x":149.2,"y":266.9,"category":"HomeRun","result":"HomeRun","exit_velocity":89.5,"launch_angle":43.3,"distance":327.0},{"x":348.7,"y":196.7,"category":"Single","result":"Single","exit_velocity":103.9,"launch_angle":10.9,"distance":214.0},{"x":285.0,"y":45.5,"category":"Out","result":"Out","exit_velocity":78.0,"launch_angle":-20.3,"distance":9.0},{"x":290.7,"y":282.3,"category":"Out","result":"Out","exit_velocity":91.9,"launch_angle":19.8,"distance":303.0},{"x":286.8,"y":52.1,"category":"Out","result":"Sacrifice","exit_velocity":29.8,"launch_angle":-2.5,"distance":17.0},{"x":277.9,"y":43.6,"category":"Out","result":"Sacrifice","exit_velocity":30.3,"launch_angle":-38.5,"distance":5.0},{"x":371.5,"y":321.8,"category":"Double","result":"Double","exit_velocity":97.1,"launch_angle":24.9,"distance":370.0},{"x":231.5,"y":269.3,"category":"Out","result":"Out","exit_velocity":94.5,"launch_angle":18.1,"distance":293.0},{"x":239.5,"y":297.6,"category":"Out","result":"Out","exit_velocity":93.8,"launch_angle":41.7,"distance":326.0},{"x":238.5,"y":270.4,"category":"Double","result":"Double","exit_velocity":99.7,"launch_angle":13.7,"distance":293.0},{"x":279.6,"y":49.4,"category":"Single","result":"Single","exit_velocity":88.2,"launch_angle":-11.2,"distance":12.0},{"x":288.4,"y":58.0,"category":"Out","result":"Out","exit_velocity":96.0,"launch_angle":-2.8,"distance":25.0},{"x":303.4,"y":156.1,"category":"Single","result":"Single","exit_velocity":98.2,"launch_angle":8.9,"distance":148.0},{"x":206.0,"y":215.4,"category":"Out","result":"Out","exit_velocity":82.3,"launch_angle":47.3,"distance":238.0},{"x":232.5,"y":181.3,"category":"Single","result":"Single","exit_velocity":68.1,"launch_angle":23.5,"distance":186.0},{"x":281.2,"y":42.1,"category":"Single","result":"Single","exit_velocity":66.3,"launch_angle":-55.0,"distance":3.0},{"x":244.0,"y":210.1,"category":"Single","result":"Single","exit_velocity":91.8,"launch_angle":12.8,"distance":217.0},{"x":282.3,"y":42.3,"category":"Out","result":"Out","exit_velocity":71.9,"launch_angle":-38.2,"distance":4.0},{"x":194.1,"y":267.7,"category":"Out","result":"Sacrifice","exit_velocity":93.3,"launch_angle":21.7,"distance":304.0},{"x":284.1,"y":48.9,"category":"Out","result":"Out","exit_velocity":91.7,"launch_angle":-12.1,"distance":12.0},{"x":269.6,"y":301.5,"category":"Out","result":"Out","exit_velocity":92.1,"launch_angle":39.2,"distance":327.0},{"x":304.4,"y":156.2,"category":"Single","result":"Single","exit_velocity":100.1,"launch_angle":7.9,"distance":148.0},{"x":308.5,"y":93.2,"category":"Single","result":"Single","exit_velocity":88.1,"launch_angle":3.8,"distance":75.0},{"x":282.1,"y":44.9,"category":"Out","result":"Out","exit_velocity":85.2,"launch_angle":-28.8,"distance":7.0},{"x":282.8,"y":42.3,"category":"Out","result":"Out","exit_velocity":69.8,"launch_angle":-46.6,"distance":4.0},{"x":325.6,"y":238.8,"category":"Single","result":"Single","exit_velocity":98.5,"launch_angle":11.6,"distance":255.0},{"x":280.3,"y":43.4,"category":"Out","result":"Error","exit_velocity":61.6,"launch_angle":-48.3,"distance":4.0},{"x":287.2,"y":52.4,"category":"Single","result":"Single","exit_velocity":73.2,"launch_angle":-2.8,"distance":18.0},{"x":282.8,"y":46.2,"category":"Out","result":"FieldersChoice","exit_velocity":95.0,"launch_angle":-20.0,"distance":8.0}],"rolling_xslg":[{"x":1,"y":0.818},{"x":2,"y":0.779},{"x":3,"y":0.686},{"x":4,"y":0.617},{"x":5,"y":0.612},{"x":6,"y":0.608},{"x":7,"y":0.552},{"x":8,"y":0.506},{"x":9,"y":0.475},{"x":10,"y":0.448},{"x":11,"y":0.457},{"x":12,"y":0.464},{"x":13,"y":0.441},{"x":14,"y":0.417},{"x":15,"y":0.395},{"x":16,"y":0.392},{"x":17,"y":0.375},{"x":18,"y":0.391},{"x":19,"y":0.385},{"x":20,"y":0.372},{"x":21,"y":0.36},{"x":22,"y":0.372},{"x":23,"y":0.36},{"x":24,"y":0.355},{"x":25,"y":0.354},{"x":26,"y":0.381},{"x":27,"y":0.406},{"x":28,"y":0.398},{"x":29,"y":0.39}],"trackman_team":"GRA_CAN","slg_con":0.39,"r":26,"rbi":24,"war_per_55":0.0105,"qab_count":47,"qab_pa":87,"qab_criteria":{"hit":20,"walk":9,"hbp":3,"sacrifice":4,"barrel":0,"eight_pitch":18,"battle_02":5},"qab_productive_out_available":false,"headshot":"gcu_player_assets/griffin-cameron-headshot.webp","header":"gcu_player_assets/griffin-cameron-header.webp","header_position":"50.0% 57.0%"},{"name":"Ky McGary","csv":"McGary, Ky","position":"OF","source_team":"ARI_SUN","pa":39,"ab":32,"pitches":138,"bats":"R","h":11,"1b":8,"2b":1,"3b":1,"hr":1,"xbh":3,"bb":4,"k":7,"hbp":3,"sac":0,"sb":5,"rbi_proxy":4,"avg":0.34375,"obp":0.46153846153846156,"slg":0.53125,"ops":0.9927884615384616,"iso":0.1875,"woba":0.413,"wrc_plus_proxy":118,"walk_rate":0.10256410256410256,"k_rate":0.1794871794871795,"bb_k":0.5714285714285714,"swing_rate":0.5507246376811594,"chase_rate":0.325,"contact_rate":0.812,"zone_contact_rate":1.0,"whiff_rate":0.188,"avg_ev":94.9,"ev90":106.2,"hard_hit_pct":0.538,"barrel_pct":0.0,"ld_pct":0.077,"gb_pct":0.615,"fb_pct":0.308,"sweet_spot":0.077,"qab":0.615,"fpct":null,"status":"Transfer: ARI_SUN","avgDisplay":".344","obpDisplay":".462","slgDisplay":".531","opsDisplay":".993","isoDisplay":".188","wobaDisplay":".413","walkRateDisplay":"10.3%","kRateDisplay":"17.9%","bbKDisplay":"0.57","chaseRateDisplay":"32.5%","swingRateDisplay":"55.1%","contactRateDisplay":"72.4%","whiffRateDisplay":"27.6%","avgEvDisplay":"94.9","ev90Display":"103.4","hardHitDisplay":"53.8%","barrelDisplay":"0.0%","ldDisplay":"24.0%","gbDisplay":"52.0%","fbDisplay":"16.0%","sweetDisplay":"28.0%","qabDisplay":"61.5%","fpctDisplay":"--","wrcPlusDisplay":"118","ops_plus":114,"opsPlusDisplay":"114","war":0.55,"owar":0.51,"drs":0.58,"defensive_runs_saved":0.58,"framing_runs_saved":0.0,"pitches_framed":0,"stolen_base_runs":0.0,"pickoff_runs":0.0,"throwing_runs":0.0,"infield_gb_runs":0.0,"double_play_runs_start":0.0,"double_play_runs_pivot":0.0,"infield_fb_runs":0.0,"bunt_runs":0.0,"outfield_fb_runs":-1.55,"outfield_arm_runs":2.12,"blocking_runs":0.0,"fld_po":12,"fld_a":2,"fld_e":1,"fld_pct":0.933,"fld_idp":null,"fld_pb":null,"synergy_pos":"LF","trackman_bbe":13,"spray_points":[{"x":249.7,"y":140.0,"category":"Out","result":"Out","exit_velocity":88.8,"launch_angle":66.5,"distance":131.0},{"x":152.5,"y":218.1,"category":"Out","result":"Out","exit_velocity":99.1,"launch_angle":54.0,"distance":274.0},{"x":246.3,"y":91.0,"category":"Out","result":"FieldersChoice","exit_velocity":103.8,"launch_angle":1.5,"distance":76.0},{"x":259.3,"y":83.7,"category":"Single","result":"Single","exit_velocity":106.8,"launch_angle":0.0,"distance":60.0},{"x":278.1,"y":43.3,"category":"Single","result":"Single","exit_velocity":90.3,"launch_angle":-40.0,"distance":5.0},{"x":276.5,"y":41.2,"category":"Single","result":"Single","exit_velocity":72.9,"launch_angle":-33.1,"distance":5.0},{"x":204.5,"y":230.6,"category":"Single","result":"Single","exit_velocity":94.2,"launch_angle":16.1,"distance":256.0},{"x":262.6,"y":220.6,"category":"Single","result":"Single","exit_velocity":111.3,"launch_angle":7.2,"distance":227.0},{"x":281.7,"y":45.6,"category":"Out","result":"Out","exit_velocity":99.9,"launch_angle":-22.0,"distance":7.0},{"x":279.9,"y":86.8,"category":"Out","result":"Out","exit_velocity":75.2,"launch_angle":3.8,"distance":59.0},{"x":283.8,"y":101.4,"category":"Single","result":"Single","exit_velocity":94.2,"launch_angle":2.4,"distance":77.0},{"x":342.0,"y":270.8,"category":"Out","result":"Out","exit_velocity":84.4,"launch_angle":30.4,"distance":299.0},{"x":277.3,"y":42.7,"category":"Out","result":"Out","exit_velocity":74.8,"launch_angle":-36.5,"distance":5.0},{"x":401.5,"y":211.8,"category":"Triple","result":"Triple","exit_velocity":95.1,"launch_angle":16.3,"distance":263.0},{"x":291.6,"y":369.2,"category":"HomeRun","result":"HomeRun","exit_velocity":102.1,"launch_angle":27.8,"distance":412.0},{"x":277.6,"y":41.7,"category":"Out","result":"Out","exit_velocity":91.0,"launch_angle":-48.6,"distance":4.0},{"x":283.0,"y":42.3,"category":"Out","result":"Out","exit_velocity":57.7,"launch_angle":-61.9,"distance":5.0},{"x":194.8,"y":147.5,"category":"Double","result":"Double","exit_velocity":102.9,"launch_angle":8.7,"distance":171.0},{"x":278.5,"y":48.0,"category":"Out","result":"Out","exit_velocity":68.7,"launch_angle":-14.2,"distance":10.0},{"x":300.1,"y":97.2,"category":"Single","result":"Single","exit_velocity":95.8,"launch_angle":1.5,"distance":76.0},{"x":257.4,"y":158.9,"category":"Single","result":"Single","exit_velocity":84.8,"launch_angle":10.2,"distance":151.0},{"x":359.6,"y":232.6,"category":"Out","result":"Out","exit_velocity":99.2,"launch_angle":12.7,"distance":261.0},{"x":273.6,"y":50.4,"category":"Out","result":"Out","exit_velocity":71.3,"launch_angle":-9.5,"distance":15.0}],"rolling_xslg":[{"x":1,"y":0.314},{"x":2,"y":0.408},{"x":3,"y":0.509},{"x":4,"y":0.457},{"x":5,"y":0.415},{"x":6,"y":0.437},{"x":7,"y":0.54},{"x":8,"y":0.527},{"x":9,"y":0.498}],"trackman_team":"ARI_SUN","slg_con":0.498,"r":15,"rbi":5,"war_per_55":0.01,"qab_count":24,"qab_pa":39,"qab_criteria":{"hit":11,"walk":4,"hbp":3,"sacrifice":0,"barrel":1,"eight_pitch":8,"battle_02":2},"qab_productive_out_available":false,"headshot":"gcu_player_assets/ky-mcgary-headshot.png"},{"name":"Jake Kulikowski","csv":"Kulikowski, Jake","position":"OF","source_team":"USF_BUL","pa":150,"ab":121,"pitches":590,"bats":"L","h":30,"1b":18,"2b":8,"3b":0,"hr":4,"xbh":12,"bb":22,"k":30,"hbp":2,"sac":5,"sb":2,"rbi_proxy":29,"avg":0.24793388429752067,"obp":0.36,"slg":0.4132231404958678,"ops":0.7732231404958678,"iso":0.1652892561983471,"woba":0.353,"wrc_plus_proxy":93,"walk_rate":0.14666666666666667,"k_rate":0.2,"bb_k":0.7333333333333333,"swing_rate":0.43728813559322033,"chase_rate":0.26628895184135976,"contact_rate":0.609,"zone_contact_rate":0.73,"whiff_rate":0.391,"avg_ev":89.7,"ev90":101.8,"hard_hit_pct":0.411,"barrel_pct":0.018,"ld_pct":0.268,"gb_pct":0.393,"fb_pct":0.339,"sweet_spot":0.304,"qab":0.497,"fpct":null,"status":"Transfer: USF_BUL","avgDisplay":".248","obpDisplay":".360","slgDisplay":".413","opsDisplay":".773","isoDisplay":".165","wobaDisplay":".353","walkRateDisplay":"14.7%","kRateDisplay":"20.0%","bbKDisplay":"0.73","chaseRateDisplay":"26.6%","swingRateDisplay":"43.7%","contactRateDisplay":"70.5%","whiffRateDisplay":"29.5%","avgEvDisplay":"89.7","ev90Display":"101.6","hardHitDisplay":"41.1%","barrelDisplay":"1.8%","ldDisplay":"24.5%","gbDisplay":"45.7%","fbDisplay":"26.6%","sweetDisplay":"28.7%","qabDisplay":"49.7%","fpctDisplay":"--","wrcPlusDisplay":"93","ops_plus":89,"opsPlusDisplay":"89","war":1.07,"owar":0.84,"drs":3.13,"defensive_runs_saved":3.13,"framing_runs_saved":0.0,"pitches_framed":0,"stolen_base_runs":0.0,"pickoff_runs":0.0,"throwing_runs":0.0,"infield_gb_runs":0.0,"double_play_runs_start":0.0,"double_play_runs_pivot":0.0,"infield_fb_runs":0.0,"bunt_runs":0.0,"outfield_fb_runs":2.71,"outfield_arm_runs":0.42,"blocking_runs":0.0,"synergy_pos":"LF","trackman_bbe":56,"spray_points":[{"x":276.2,"y":321.5,"category":"Double","result":"Double","exit_velocity":102.0,"launch_angle":18.3,"distance":352.0},{"x":303.2,"y":165.2,"category":"Single","result":"Single","exit_velocity":86.3,"launch_angle":11.8,"distance":159.0},{"x":284.2,"y":47.5,"category":"Out","result":"Out","exit_velocity":84.5,"launch_angle":-17.2,"distance":11.0},{"x":278.7,"y":47.2,"category":"Out","result":"Out","exit_velocity":101.6,"launch_angle":-13.1,"distance":9.0},{"x":306.5,"y":91.8,"category":"Out","result":"Out","exit_velocity":101.1,"launch_angle":3.4,"distance":73.0},{"x":279.6,"y":46.3,"category":"Out","result":"Out","exit_velocity":95.3,"launch_angle":-19.7,"distance":8.0},{"x":354.5,"y":325.8,"category":"Out","result":"Out","exit_velocity":97.5,"launch_angle":37.7,"distance":369.0},{"x":298.4,"y":320.4,"category":"Out","result":"Out","exit_velocity":97.8,"launch_angle":20.0,"distance":351.0},{"x":280.0,"y":44.5,"category":"Out","result":"Out","exit_velocity":78.4,"launch_angle":-32.5,"distance":6.0},{"x":247.3,"y":283.1,"category":"Double","result":"Double","exit_velocity":83.7,"launch_angle":27.7,"distance":307.0},{"x":282.1,"y":281.2,"category":"Out","result":"Out","exit_velocity":104.2,"launch_angle":15.9,"distance":301.0},{"x":226.7,"y":248.8,"category":"Out","result":"Out","exit_velocity":87.3,"launch_angle":44.2,"distance":269.0},{"x":299.6,"y":271.2,"category":"Out","result":"Sacrifice","exit_velocity":92.8,"launch_angle":44.6,"distance":290.0},{"x":241.0,"y":215.8,"category":"Single","result":"Single","exit_velocity":74.2,"launch_angle":24.6,"distance":225.0},{"x":291.0,"y":310.0,"category":"Out","result":"Out","exit_velocity":94.3,"launch_angle":38.6,"distance":338.0},{"x":286.5,"y":55.0,"category":"Out","result":"Out","exit_velocity":87.2,"launch_angle":-7.1,"distance":20.0},{"x":366.3,"y":332.7,"category":"HomeRun","result":"HomeRun","exit_velocity":101.5,"launch_angle":21.4,"distance":381.0},{"x":282.7,"y":45.7,"category":"Out","result":"Out","exit_velocity":85.3,"launch_angle":-22.2,"distance":8.0},{"x":338.2,"y":211.1,"category":"Single","result":"Single","exit_velocity":72.7,"launch_angle":46.7,"distance":226.0},{"x":281.9,"y":43.4,"category":"Out","result":"Out","exit_velocity":71.8,"launch_angle":-31.3,"distance":5.0},{"x":279.4,"y":51.4,"category":"Single","result":"Single","exit_velocity":72.5,"launch_angle":-10.5,"distance":14.0},{"x":253.7,"y":164.8,"category":"Out","result":"Out","exit_velocity":87.9,"launch_angle":10.2,"distance":159.0},{"x":309.6,"y":229.1,"category":"Single","result":"Single","exit_velocity":80.1,"launch_angle":19.2,"distance":239.0},{"x":296.3,"y":78.7,"category":"Single","result":"Single","exit_velocity":105.9,"launch_angle":0.2,"distance":53.0},{"x":360.1,"y":329.4,"category":"Double","result":"Double","exit_velocity":105.6,"launch_angle":21.0,"distance":375.0},{"x":288.4,"y":48.9,"category":"Out","result":"Out","exit_velocity":90.2,"launch_angle":-8.8,"distance":15.0},{"x":285.1,"y":44.2,"category":"Out","result":"Out","exit_velocity":80.7,"launch_angle":-20.4,"distance":8.0},{"x":364.1,"y":336.7,"category":"Out","result":"Out","exit_velocity":100.2,"launch_angle":32.9,"distance":386.0},{"x":258.2,"y":86.7,"category":"Out","result":"Out","exit_velocity":32.5,"launch_angle":48.3,"distance":64.0},{"x":280.1,"y":43.0,"category":"Out","result":"Out","exit_velocity":65.5,"launch_angle":-51.4,"distance":4.0},{"x":282.3,"y":41.5,"category":"Out","result":"FieldersChoice","exit_velocity":86.8,"launch_angle":-47.9,"distance":3.0},{"x":285.1,"y":51.6,"category":"Out","result":"Out","exit_velocity":97.9,"launch_angle":-10.7,"distance":16.0},{"x":295.1,"y":59.7,"category":"Out","result":"Error","exit_velocity":100.0,"launch_angle":-4.8,"distance":31.0},{"x":389.2,"y":283.0,"category":"Out","result":"Out","exit_velocity":95.5,"launch_angle":32.9,"distance":333.0},{"x":274.4,"y":305.8,"category":"Out","result":"Out","exit_velocity":99.1,"launch_angle":24.6,"distance":332.0},{"x":350.8,"y":135.6,"category":"Out","result":"Out","exit_velocity":102.3,"launch_angle":7.0,"distance":149.0},{"x":375.9,"y":174.8,"category":"Double","result":"Double","exit_velocity":99.0,"launch_angle":13.0,"distance":207.0},{"x":276.0,"y":158.9,"category":"Out","result":"Out","exit_velocity":83.7,"launch_angle":7.9,"distance":149.0},{"x":362.4,"y":272.8,"category":"Out","result":"Sacrifice","exit_velocity":104.2,"launch_angle":14.8,"distance":309.0},{"x":378.4,"y":214.8,"category":"Single","result":"Single","exit_velocity":97.3,"launch_angle":15.9,"distance":251.0},{"x":266.6,"y":231.1,"category":"Single","result":"Single","exit_velocity":98.0,"launch_angle":10.9,"distance":239.0},{"x":310.1,"y":131.2,"category":"Out","result":"Out","exit_velocity":81.7,"launch_angle":6.8,"distance":120.0},{"x":292.9,"y":55.5,"category":"Out","result":"Out","exit_velocity":96.8,"launch_angle":-5.5,"distance":25.0},{"x":281.4,"y":82.3,"category":"Single","result":"Single","exit_velocity":93.6,"launch_angle":0.9,"distance":53.0},{"x":389.6,"y":300.0,"category":"HomeRun","result":"HomeRun","exit_velocity":100.8,"launch_angle":21.9,"distance":353.0},{"x":282.0,"y":40.9,"category":"Single","result":"Single","exit_velocity":65.0,"launch_angle":-69.3,"distance":3.0},{"x":347.8,"y":327.0,"category":"Out","result":"Out","exit_velocity":100.9,"launch_angle":28.9,"distance":369.0},{"x":272.4,"y":151.0,"category":"Out","result":"Out","exit_velocity":68.3,"launch_angle":59.7,"distance":139.0},{"x":280.8,"y":44.4,"category":"Out","result":"Error","exit_velocity":81.0,"launch_angle":-25.4,"distance":6.0},{"x":348.2,"y":300.8,"category":"Out","result":"Out","exit_velocity":95.9,"launch_angle":41.8,"distance":337.0},{"x":283.3,"y":44.9,"category":"Out","result":"Out","exit_velocity":53.3,"launch_angle":-32.9,"distance":7.0},{"x":399.0,"y":262.7,"category":"Out","result":"Out","exit_velocity":85.1,"launch_angle":27.9,"distance":316.0},{"x":281.3,"y":40.2,"category":"Out","result":"Out","exit_velocity":54.7,"launch_angle":-77.4,"distance":2.0},{"x":387.1,"y":222.1,"category":"Double","result":"Double","exit_velocity":95.2,"launch_angle":15.5,"distance":264.0},{"x":282.4,"y":42.3,"category":"Out","result":"Out","exit_velocity":70.5,"launch_angle":-42.4,"distance":4.0},{"x":285.8,"y":58.0,"category":"Out","result":"Out","exit_velocity":96.5,"launch_angle":-5.9,"distance":24.0},{"x":328.4,"y":298.6,"category":"Out","result":"Out","exit_velocity":97.2,"launch_angle":32.1,"distance":329.0},{"x":189.3,"y":274.6,"category":"Double","result":"Double","exit_velocity":95.6,"launch_angle":22.1,"distance":314.0},{"x":378.0,"y":278.9,"category":"Out","result":"Out","exit_velocity":99.0,"launch_angle":36.0,"distance":323.0},{"x":277.7,"y":38.3,"category":"Out","result":"Sacrifice","exit_velocity":39.6,"launch_angle":-76.5,"distance":4.0},{"x":297.8,"y":243.5,"category":"Single","result":"Single","exit_velocity":101.0,"launch_angle":13.6,"distance":255.0},{"x":278.9,"y":43.5,"category":"Out","result":"Out","exit_velocity":67.9,"launch_angle":-35.4,"distance":5.0},{"x":363.2,"y":245.7,"category":"Out","result":"Sacrifice","exit_velocity":84.9,"launch_angle":39.4,"distance":277.0},{"x":430.3,"y":293.0,"category":"HomeRun","result":"HomeRun","exit_velocity":98.4,"launch_angle":31.9,"distance":368.0},{"x":281.1,"y":50.3,"category":"Out","result":"Error","exit_velocity":98.5,"launch_angle":-12.7,"distance":13.0},{"x":280.8,"y":44.2,"category":"Out","result":"Out","exit_velocity":36.7,"launch_angle":-49.1,"distance":5.0},{"x":229.3,"y":288.1,"category":"Out","result":"Sacrifice","exit_velocity":86.5,"launch_angle":40.8,"distance":317.0},{"x":342.0,"y":215.8,"category":"Out","result":"Out","exit_velocity":81.5,"launch_angle":54.0,"distance":233.0},{"x":358.9,"y":156.6,"category":"Single","result":"Single","exit_velocity":84.8,"launch_angle":13.8,"distance":176.0},{"x":280.8,"y":51.2,"category":"Single","result":"Single","exit_velocity":100.9,"launch_angle":-9.6,"distance":14.0},{"x":287.2,"y":53.5,"category":"Out","result":"Out","exit_velocity":95.6,"launch_angle":-10.1,"distance":19.0},{"x":286.1,"y":57.4,"category":"Out","result":"Out","exit_velocity":103.1,"launch_angle":-6.4,"distance":23.0},{"x":251.6,"y":230.9,"category":"Out","result":"Out","exit_velocity":92.7,"launch_angle":52.0,"distance":241.0},{"x":273.6,"y":88.7,"category":"Single","result":"Single","exit_velocity":94.4,"launch_angle":0.7,"distance":61.0},{"x":234.0,"y":289.8,"category":"Out","result":"Out","exit_velocity":89.9,"launch_angle":32.3,"distance":317.0},{"x":282.2,"y":40.4,"category":"Out","result":"Out","exit_velocity":73.9,"launch_angle":-63.1,"distance":3.0},{"x":204.6,"y":152.8,"category":"Double","result":"Double","exit_velocity":78.1,"launch_angle":13.0,"distance":170.0},{"x":280.9,"y":53.0,"category":"Out","result":"Out","exit_velocity":79.6,"launch_angle":-11.1,"distance":16.0},{"x":278.4,"y":49.0,"category":"Single","result":"Single","exit_velocity":40.7,"launch_angle":-14.8,"distance":11.0},{"x":420.4,"y":332.1,"category":"HomeRun","result":"HomeRun","exit_velocity":101.2,"launch_angle":31.2,"distance":405.0},{"x":286.2,"y":52.3,"category":"Out","result":"Out","exit_velocity":98.8,"launch_angle":-6.6,"distance":17.0},{"x":273.9,"y":63.0,"category":"Single","result":"Single","exit_velocity":101.7,"launch_angle":-2.8,"distance":30.0},{"x":291.7,"y":69.6,"category":"Out","result":"Out","exit_velocity":78.8,"launch_angle":-0.1,"distance":40.0},{"x":180.9,"y":267.7,"category":"Out","result":"Out","exit_velocity":91.3,"launch_angle":38.4,"distance":310.0},{"x":331.1,"y":277.3,"category":"Single","result":"Single","exit_velocity":89.7,"launch_angle":25.8,"distance":303.0},{"x":303.3,"y":251.9,"category":"Out","result":"Out","exit_velocity":85.8,"launch_angle":45.8,"distance":266.0},{"x":156.0,"y":242.9,"category":"Double","result":"Double","exit_velocity":92.2,"launch_angle":19.2,"distance":297.0},{"x":297.5,"y":117.8,"category":"Out","result":"Out","exit_velocity":102.6,"launch_angle":3.8,"distance":100.0},{"x":287.0,"y":49.4,"category":"Single","result":"Single","exit_velocity":88.6,"launch_angle":-10.1,"distance":15.0}],"rolling_xslg":[{"x":1,"y":0.671},{"x":2,"y":0.559},{"x":3,"y":0.563},{"x":4,"y":0.565},{"x":5,"y":0.574},{"x":6,"y":0.581},{"x":7,"y":0.534},{"x":8,"y":0.496},{"x":9,"y":0.509},{"x":10,"y":0.52},{"x":11,"y":0.55},{"x":12,"y":0.577},{"x":13,"y":0.544},{"x":14,"y":0.515},{"x":15,"y":0.54},{"x":16,"y":0.562},{"x":17,"y":0.602},{"x":18,"y":0.639},{"x":19,"y":0.611},{"x":20,"y":0.586},{"x":21,"y":0.564},{"x":22,"y":0.544},{"x":23,"y":0.524},{"x":24,"y":0.505},{"x":25,"y":0.522},{"x":26,"y":0.537},{"x":27,"y":0.532},{"x":28,"y":0.528},{"x":29,"y":0.523},{"x":30,"y":0.508},{"x":31,"y":0.494},{"x":32,"y":0.515},{"x":33,"y":0.536},{"x":34,"y":0.522},{"x":35,"y":0.51},{"x":36,"y":0.498},{"x":37,"y":0.488},{"x":38,"y":0.477},{"x":39,"y":0.475},{"x":40,"y":0.478},{"x":41,"y":0.49},{"x":42,"y":0.48},{"x":43,"y":0.507},{"x":44,"y":0.523},{"x":45,"y":0.512},{"x":46,"y":0.512},{"x":47,"y":0.503},{"x":48,"y":0.499},{"x":49,"y":0.492},{"x":50,"y":0.488},{"x":51,"y":0.487},{"x":52,"y":0.495}],"trackman_team":"USF_BUL","slg_con":0.495,"r":28,"rbi":29,"war_per_55":0.0195,"qab_count":74,"qab_pa":149,"qab_criteria":{"hit":30,"walk":22,"hbp":2,"sacrifice":5,"barrel":3,"eight_pitch":27,"battle_02":9},"qab_productive_out_available":false,"headshot":"gcu_player_assets/jake-kulikowski-headshot.png","header":"gcu_player_assets/jake-kulikowski-header.jpg","header_position":"50.0% 18.3%"},{"name":"Andrew Ildefonso","csv":"Ildefonso, Andrew","position":"OF","source_team":"FIU","pa":256,"ab":224,"pitches":862,"bats":"R","h":65,"1b":42,"2b":13,"3b":1,"hr":9,"xbh":23,"bb":16,"k":22,"hbp":13,"sac":3,"sb":4,"rbi_proxy":44,"avg":0.29,"obp":0.367,"slg":0.478,"ops":0.845,"iso":0.188,"woba":0.367,"wrc_plus_proxy":94,"walk_rate":0.056910569105691054,"k_rate":0.08536585365853659,"bb_k":0.6666666666666666,"swing_rate":0.46403712296983757,"chase_rate":0.3032258064516129,"contact_rate":0.86,"zone_contact_rate":0.9,"whiff_rate":0.14,"avg_ev":88.4,"ev90":104.6,"hard_hit_pct":0.4,"barrel_pct":0.033,"ld_pct":0.167,"gb_pct":0.567,"fb_pct":0.267,"sweet_spot":0.244,"qab":0.508,"fpct":null,"status":"Transfer: FIU","avgDisplay":".290","obpDisplay":".367","slgDisplay":".478","opsDisplay":".845","isoDisplay":".188","wobaDisplay":".367","walkRateDisplay":"5.7%","kRateDisplay":"8.5%","bbKDisplay":"0.67","chaseRateDisplay":"30.3%","swingRateDisplay":"46.4%","contactRateDisplay":"89.0%","whiffRateDisplay":"11.0%","avgEvDisplay":"88.4","ev90Display":"104.7","hardHitDisplay":"40.0%","barrelDisplay":"3.3%","ldDisplay":"20.5%","gbDisplay":"45.1%","fbDisplay":"23.1%","sweetDisplay":"31.3%","qabDisplay":"50.8%","fpctDisplay":"--","wrcPlusDisplay":"94","ops_plus":95,"opsPlusDisplay":"95","war":1.39,"owar":1.43,"drs":-0.56,"defensive_runs_saved":-0.56,"framing_runs_saved":0.0,"pitches_framed":0,"stolen_base_runs":0.0,"pickoff_runs":0.0,"throwing_runs":0.0,"infield_gb_runs":0.0,"double_play_runs_start":0.0,"double_play_runs_pivot":0.0,"infield_fb_runs":0.0,"bunt_runs":0.0,"outfield_fb_runs":-2.27,"outfield_arm_runs":1.73,"blocking_runs":0.0,"fld_po":90,"fld_a":3,"fld_e":3,"fld_pct":0.969,"fld_idp":null,"fld_pb":null,"synergy_pos":"LF","trackman_bbe":90,"spray_points":[{"x":272.7,"y":61.1,"category":"Out","result":"Error","exit_velocity":82.1,"launch_angle":-4.1,"distance":28.0},{"x":277.1,"y":39.1,"category":"Single","result":"Single","exit_velocity":58.7,"launch_angle":-66.1,"distance":4.0},{"x":346.9,"y":140.9,"category":"Out","result":"Out","exit_velocity":100.7,"launch_angle":6.2,"distance":151.0},{"x":308.6,"y":268.8,"category":"Out","result":"Out","exit_velocity":86.3,"launch_angle":37.8,"distance":288.0},{"x":316.0,"y":283.7,"category":"Out","result":"Out","exit_velocity":93.2,"launch_angle":28.5,"distance":308.0},{"x":241.0,"y":84.7,"category":"Double","result":"Double","exit_velocity":103.1,"launch_angle":3.1,"distance":74.0},{"x":278.4,"y":47.3,"category":"Out","result":"Out","exit_velocity":91.4,"launch_angle":-20.4,"distance":9.0},{"x":272.7,"y":187.6,"category":"Single","result":"Single","exit_velocity":98.2,"launch_angle":9.9,"distance":185.0},{"x":249.9,"y":167.9,"category":"Out","result":"Out","exit_velocity":107.3,"launch_angle":5.3,"distance":164.0},{"x":346.2,"y":212.7,"category":"Out","result":"Out","exit_velocity":73.9,"launch_angle":38.6,"distance":231.0},{"x":402.0,"y":212.6,"category":"Out","result":"Out","exit_velocity":83.0,"launch_angle":36.3,"distance":264.0},{"x":274.4,"y":46.5,"category":"Out","result":"Out","exit_velocity":100.1,"launch_angle":-13.7,"distance":11.0},{"x":276.7,"y":105.5,"category":"Single","result":"Single","exit_velocity":99.8,"launch_angle":2.0,"distance":82.0},{"x":254.9,"y":315.1,"category":"Out","result":"Out","exit_velocity":97.8,"launch_angle":22.0,"distance":345.0},{"x":282.9,"y":269.3,"category":"Out","result":"Out","exit_velocity":82.4,"launch_angle":36.3,"distance":287.0},{"x":282.4,"y":59.2,"category":"Out","result":"Out","exit_velocity":74.7,"launch_angle":-4.6,"distance":24.0},{"x":278.4,"y":226.6,"category":"Single","result":"Single","exit_velocity":76.6,"launch_angle":20.7,"distance":233.0},{"x":405.3,"y":197.5,"category":"Out","result":"Out","exit_velocity":82.6,"launch_angle":40.1,"distance":252.0},{"x":276.8,"y":45.0,"category":"Out","result":"Out","exit_velocity":81.0,"launch_angle":-33.3,"distance":7.0},{"x":399.1,"y":220.4,"category":"Out","result":"Out","exit_velocity":84.8,"launch_angle":37.4,"distance":270.0},{"x":197.7,"y":182.1,"category":"Out","result":"Out","exit_velocity":74.3,"launch_angle":50.4,"distance":205.0},{"x":250.9,"y":131.9,"category":"Out","result":"Out","exit_velocity":93.9,"launch_angle":5.4,"distance":121.0},{"x":278.2,"y":42.3,"category":"Out","result":"Out","exit_velocity":33.6,"launch_angle":-59.1,"distance":4.0},{"x":277.2,"y":43.6,"category":"Single","result":"Single","exit_velocity":86.3,"launch_angle":-23.8,"distance":6.0},{"x":285.6,"y":53.0,"category":"Single","result":"Single","exit_velocity":102.0,"launch_angle":-6.9,"distance":18.0},{"x":244.1,"y":186.4,"category":"Out","result":"Out","exit_velocity":101.8,"launch_angle":6.4,"distance":188.0},{"x":339.0,"y":316.1,"category":"Double","result":"Double","exit_velocity":98.4,"launch_angle":21.5,"distance":353.0},{"x":278.3,"y":44.6,"category":"Out","result":"Out","exit_velocity":89.0,"launch_angle":-24.4,"distance":6.0},{"x":210.9,"y":325.5,"category":"Double","result":"Double","exit_velocity":98.3,"launch_angle":20.8,"distance":367.0},{"x":274.0,"y":55.3,"category":"Single","result":"Single","exit_velocity":101.5,"launch_angle":-10.3,"distance":21.0},{"x":171.3,"y":287.4,"category":"Out","result":"Out","exit_velocity":95.4,"launch_angle":36.1,"distance":338.0},{"x":230.3,"y":349.0,"category":"Double","result":"Double","exit_velocity":104.8,"launch_angle":19.9,"distance":391.0},{"x":198.5,"y":236.3,"category":"Out","result":"Out","exit_velocity":90.1,"launch_angle":14.7,"distance":266.0},{"x":182.7,"y":336.8,"category":"HomeRun","result":"HomeRun","exit_velocity":107.3,"launch_angle":18.6,"distance":390.0},{"x":274.6,"y":44.9,"category":"Out","result":"Out","exit_velocity":107.3,"launch_angle":-22.5,"distance":9.0},{"x":161.5,"y":281.3,"category":"Out","result":"Out","exit_velocity":95.4,"launch_angle":19.9,"distance":336.0},{"x":338.2,"y":209.3,"category":"Single","result":"Single","exit_velocity":81.2,"launch_angle":17.6,"distance":224.0},{"x":275.0,"y":281.9,"category":"Out","result":"Out","exit_velocity":104.9,"launch_angle":12.8,"distance":302.0},{"x":258.7,"y":61.8,"category":"Out","result":"Out","exit_velocity":96.0,"launch_angle":-0.7,"distance":38.0},{"x":354.8,"y":246.4,"category":"Out","result":"Out","exit_velocity":99.6,"launch_angle":14.6,"distance":274.0},{"x":237.2,"y":146.5,"category":"Out","result":"Out","exit_velocity":87.9,"launch_angle":8.2,"distance":143.0},{"x":284.5,"y":43.8,"category":"Out","result":"Out","exit_velocity":67.8,"launch_angle":-24.6,"distance":7.0},{"x":179.2,"y":300.0,"category":"HomeRun","result":"HomeRun","exit_velocity":99.5,"launch_angle":25.1,"distance":349.0},{"x":364.4,"y":228.0,"category":"Out","result":"Out","exit_velocity":92.5,"launch_angle":46.9,"distance":258.0},{"x":216.6,"y":119.4,"category":"Out","result":"Out","exit_velocity":104.5,"launch_angle":5.6,"distance":127.0},{"x":278.5,"y":39.2,"category":"Out","result":"Out","exit_velocity":62.4,"launch_angle":-51.2,"distance":2.0},{"x":279.5,"y":47.5,"category":"Out","result":"Out","exit_velocity":100.9,"launch_angle":-14.8,"distance":9.0},{"x":281.7,"y":46.9,"category":"Single","result":"Single","exit_velocity":93.5,"launch_angle":-22.3,"distance":9.0},{"x":258.6,"y":106.6,"category":"Out","result":"Out","exit_velocity":76.7,"launch_angle":6.7,"distance":87.0},{"x":289.8,"y":63.2,"category":"Single","result":"Single","exit_velocity":71.5,"launch_angle":-0.9,"distance":32.0},{"x":233.8,"y":111.1,"category":"Single","result":"Single","exit_velocity":106.2,"launch_angle":5.6,"distance":106.0},{"x":337.4,"y":157.9,"category":"Single","result":"Single","exit_velocity":104.9,"launch_angle":5.7,"distance":164.0},{"x":286.4,"y":125.1,"category":"Out","result":"FieldersChoice","exit_velocity":73.9,"launch_angle":6.8,"distance":107.0},{"x":259.9,"y":60.7,"category":"Double","result":"Double","exit_velocity":101.5,"launch_angle":-3.1,"distance":36.0},{"x":313.5,"y":189.5,"category":"Single","result":"Single","exit_velocity":106.9,"launch_angle":6.1,"distance":191.0},{"x":184.4,"y":264.9,"category":"Out","result":"Out","exit_velocity":88.9,"launch_angle":19.5,"distance":305.0},{"x":280.9,"y":47.6,"category":"Out","result":"Out","exit_velocity":99.8,"launch_angle":-19.6,"distance":10.0},{"x":188.6,"y":175.9,"category":"Double","result":"Double","exit_velocity":87.5,"launch_angle":17.3,"distance":205.0},{"x":291.4,"y":89.3,"category":"Single","result":"Single","exit_velocity":88.4,"launch_angle":1.7,"distance":63.0},{"x":280.1,"y":43.8,"category":"Out","result":"Out","exit_velocity":79.6,"launch_angle":-36.9,"distance":5.0},{"x":213.1,"y":152.1,"category":"Out","result":"Out","exit_velocity":62.1,"launch_angle":51.6,"distance":163.0},{"x":301.7,"y":273.8,"category":"Out","result":"Out","exit_velocity":90.0,"launch_angle":26.8,"distance":294.0},{"x":275.1,"y":47.4,"category":"Out","result":"FieldersChoice","exit_velocity":90.9,"launch_angle":-20.2,"distance":11.0},{"x":183.2,"y":290.6,"category":"Out","result":"Sacrifice","exit_velocity":96.2,"launch_angle":33.6,"distance":336.0},{"x":234.0,"y":121.9,"category":"Single","result":"Single","exit_velocity":108.4,"launch_angle":6.1,"distance":117.0},{"x":286.9,"y":44.5,"category":"Out","result":"FieldersChoice","exit_velocity":30.3,"launch_angle":-24.6,"distance":10.0},{"x":303.8,"y":84.9,"category":"Out","result":"Out","exit_velocity":42.0,"launch_angle":13.4,"distance":64.0},{"x":374.1,"y":222.1,"category":"Triple","result":"Triple","exit_velocity":95.9,"launch_angle":19.4,"distance":256.0},{"x":276.4,"y":164.2,"category":"Single","result":"Single","exit_velocity":83.3,"launch_angle":10.6,"distance":155.0},{"x":275.4,"y":53.3,"category":"Out","result":"Out","exit_velocity":77.3,"launch_angle":-9.4,"distance":18.0},{"x":362.1,"y":279.8,"category":"Out","result":"Out","exit_velocity":90.5,"launch_angle":27.5,"distance":317.0},{"x":363.8,"y":231.9,"category":"Out","result":"Out","exit_velocity":95.9,"launch_angle":13.3,"distance":262.0},{"x":279.0,"y":66.1,"category":"Single","result":"Single","exit_velocity":100.8,"launch_angle":-3.5,"distance":33.0},{"x":279.9,"y":42.9,"category":"Out","result":"Out","exit_velocity":80.5,"launch_angle":-36.2,"distance":4.0},{"x":224.0,"y":153.5,"category":"Single","result":"Single","exit_velocity":81.9,"launch_angle":13.3,"distance":158.0},{"x":225.5,"y":284.2,"category":"Out","result":"Sacrifice","exit_velocity":96.3,"launch_angle":30.6,"distance":313.0},{"x":217.0,"y":251.9,"category":"Out","result":"Out","exit_velocity":90.2,"launch_angle":35.3,"distance":276.0},{"x":278.3,"y":47.7,"category":"Out","result":"FieldersChoice","exit_velocity":92.7,"launch_angle":-22.8,"distance":10.0},{"x":258.7,"y":142.9,"category":"Out","result":"Out","exit_velocity":87.8,"launch_angle":61.6,"distance":131.0},{"x":259.0,"y":298.0,"category":"Out","result":"Out","exit_velocity":106.9,"launch_angle":15.5,"distance":324.0},{"x":271.7,"y":64.5,"category":"Out","result":"Out","exit_velocity":90.3,"launch_angle":-2.3,"distance":32.0},{"x":282.8,"y":176.4,"category":"Out","result":"Out","exit_velocity":71.1,"launch_angle":50.6,"distance":170.0},{"x":263.7,"y":84.1,"category":"Out","result":"Out","exit_velocity":91.8,"launch_angle":0.7,"distance":59.0},{"x":280.1,"y":39.2,"category":"Out","result":"Out","exit_velocity":44.1,"launch_angle":-46.2,"distance":1.0},{"x":288.3,"y":51.0,"category":"Out","result":"Error","exit_velocity":75.9,"launch_angle":-8.0,"distance":17.0},{"x":356.8,"y":103.1,"category":"Out","result":"Out","exit_velocity":71.8,"launch_angle":65.9,"distance":124.0},{"x":283.3,"y":157.0,"category":"Out","result":"Out","exit_velocity":78.4,"launch_angle":61.5,"distance":146.0},{"x":156.0,"y":243.8,"category":"Double","result":"Double","exit_velocity":106.4,"launch_angle":17.5,"distance":298.0},{"x":270.1,"y":55.3,"category":"Out","result":"Out","exit_velocity":101.6,"launch_angle":-7.1,"distance":23.0},{"x":277.2,"y":122.1,"category":"Single","result":"Single","exit_velocity":70.4,"launch_angle":7.6,"distance":103.0},{"x":321.2,"y":149.4,"category":"Out","result":"Out","exit_velocity":76.3,"launch_angle":60.7,"distance":146.0},{"x":283.1,"y":103.7,"category":"Out","result":"Out","exit_velocity":74.6,"launch_angle":69.8,"distance":80.0},{"x":286.3,"y":46.7,"category":"Out","result":"Out","exit_velocity":43.4,"launch_angle":-11.3,"distance":12.0},{"x":222.6,"y":297.2,"category":"Out","result":"Out","exit_velocity":89.2,"launch_angle":36.3,"distance":329.0},{"x":281.1,"y":98.6,"category":"Out","result":"Out","exit_velocity":93.8,"launch_angle":1.3,"distance":73.0},{"x":222.7,"y":127.5,"category":"Out","result":"Out","exit_velocity":89.0,"launch_angle":64.5,"distance":131.0},{"x":323.3,"y":138.5,"category":"Single","result":"Single","exit_velocity":79.6,"launch_angle":7.4,"distance":134.0},{"x":247.5,"y":146.5,"category":"Out","result":"Out","exit_velocity":88.2,"launch_angle":61.4,"distance":139.0},{"x":115.3,"y":318.6,"category":"HomeRun","result":"HomeRun","exit_velocity":107.2,"launch_angle":21.4,"distance":405.0},{"x":232.6,"y":121.3,"category":"Single","result":"Single","exit_velocity":106.8,"launch_angle":4.6,"distance":118.0},{"x":293.1,"y":132.8,"category":"Out","result":"FieldersChoice","exit_velocity":72.9,"launch_angle":9.9,"distance":117.0},{"x":271.5,"y":53.4,"category":"Out","result":"Out","exit_velocity":95.8,"launch_angle":-6.3,"distance":20.0},{"x":287.5,"y":185.6,"category":"Single","result":"Single","exit_velocity":104.2,"launch_angle":10.2,"distance":182.0},{"x":221.8,"y":280.7,"category":"Out","result":"Out","exit_velocity":91.0,"launch_angle":26.3,"distance":310.0},{"x":236.1,"y":334.0,"category":"Out","result":"Out","exit_velocity":94.6,"launch_angle":27.2,"distance":372.0},{"x":321.3,"y":208.3,"category":"Out","result":"Out","exit_velocity":82.7,"launch_angle":41.2,"distance":217.0},{"x":161.6,"y":231.5,"category":"Out","result":"Out","exit_velocity":93.6,"launch_angle":45.5,"distance":281.0},{"x":276.7,"y":41.6,"category":"Out","result":"Out","exit_velocity":81.0,"launch_angle":-43.2,"distance":5.0},{"x":274.6,"y":52.8,"category":"Out","result":"Out","exit_velocity":79.8,"launch_angle":-10.0,"distance":17.0},{"x":242.0,"y":219.2,"category":"Single","result":"Single","exit_velocity":74.9,"launch_angle":20.2,"distance":229.0},{"x":345.0,"y":134.3,"category":"Out","result":"Out","exit_velocity":78.9,"launch_angle":59.8,"distance":143.0},{"x":328.8,"y":134.9,"category":"Out","result":"Out","exit_velocity":50.4,"launch_angle":42.5,"distance":133.0},{"x":277.3,"y":41.2,"category":"Out","result":"Out","exit_velocity":94.9,"launch_angle":-40.6,"distance":4.0},{"x":244.4,"y":357.7,"category":"Double","result":"Double","exit_velocity":102.4,"launch_angle":24.3,"distance":400.0},{"x":229.0,"y":229.1,"category":"Single","result":"Single","exit_velocity":91.6,"launch_angle":10.2,"distance":245.0},{"x":261.1,"y":309.6,"category":"Out","result":"Out","exit_velocity":102.5,"launch_angle":26.0,"distance":338.0},{"x":298.6,"y":207.0,"category":"Out","result":"Out","exit_velocity":68.9,"launch_angle":31.9,"distance":210.0},{"x":150.2,"y":298.0,"category":"HomeRun","result":"HomeRun","exit_velocity":104.4,"launch_angle":27.1,"distance":361.0},{"x":239.9,"y":202.6,"category":"Single","result":"Single","exit_velocity":76.7,"launch_angle":16.4,"distance":209.0},{"x":284.6,"y":41.3,"category":"Out","result":"Out","exit_velocity":27.5,"launch_angle":-40.2,"distance":6.0},{"x":199.1,"y":270.1,"category":"Out","result":"Out","exit_velocity":89.0,"launch_angle":31.6,"distance":305.0},{"x":285.7,"y":51.6,"category":"Single","result":"Single","exit_velocity":99.5,"launch_angle":-10.2,"distance":16.0},{"x":277.6,"y":42.7,"category":"Out","result":"Out","exit_velocity":74.1,"launch_angle":-52.0,"distance":4.0},{"x":277.6,"y":43.6,"category":"Out","result":"Out","exit_velocity":90.8,"launch_angle":-36.6,"distance":5.0},{"x":168.6,"y":297.7,"category":"HomeRun","result":"HomeRun","exit_velocity":103.6,"launch_angle":26.6,"distance":351.0},{"x":278.8,"y":41.1,"category":"Out","result":"Error","exit_velocity":67.3,"launch_angle":-77.4,"distance":2.0},{"x":244.4,"y":317.4,"category":"Out","result":"Out","exit_velocity":97.5,"launch_angle":35.9,"distance":350.0},{"x":307.7,"y":254.9,"category":"Out","result":"Out","exit_velocity":87.2,"launch_angle":43.4,"distance":271.0},{"x":253.2,"y":152.3,"category":"Single","result":"Single","exit_velocity":105.9,"launch_angle":6.6,"distance":144.0},{"x":200.3,"y":226.8,"category":"Single","result":"Single","exit_velocity":109.7,"launch_angle":12.8,"distance":254.0},{"x":229.1,"y":291.8,"category":"Out","result":"Out","exit_velocity":89.0,"launch_angle":36.9,"distance":321.0},{"x":230.1,"y":257.5,"category":"Out","result":"Out","exit_velocity":83.8,"launch_angle":43.8,"distance":279.0},{"x":274.2,"y":323.0,"category":"Out","result":"Sacrifice","exit_velocity":98.9,"launch_angle":22.9,"distance":354.0},{"x":279.0,"y":44.7,"category":"Out","result":"Out","exit_velocity":88.6,"launch_angle":-23.6,"distance":6.0},{"x":271.4,"y":209.7,"category":"Out","result":"Out","exit_velocity":85.6,"launch_angle":52.0,"distance":212.0},{"x":276.7,"y":43.3,"category":"Out","result":"Out","exit_velocity":93.3,"launch_angle":-27.6,"distance":6.0},{"x":308.8,"y":117.9,"category":"Out","result":"Out","exit_velocity":82.6,"launch_angle":67.7,"distance":104.0},{"x":275.7,"y":42.8,"category":"Out","result":"Out","exit_velocity":91.6,"launch_angle":-29.7,"distance":6.0},{"x":248.0,"y":81.4,"category":"Out","result":"Out","exit_velocity":81.8,"launch_angle":5.0,"distance":65.0},{"x":349.8,"y":270.4,"category":"Out","result":"Out","exit_velocity":92.4,"launch_angle":21.5,"distance":301.0},{"x":261.8,"y":254.9,"category":"Out","result":"Out","exit_velocity":94.5,"launch_angle":48.1,"distance":270.0},{"x":340.9,"y":182.0,"category":"Out","result":"Out","exit_velocity":84.2,"launch_angle":57.2,"distance":193.0},{"x":247.6,"y":266.4,"category":"Out","result":"Out","exit_velocity":86.7,"launch_angle":40.4,"distance":286.0},{"x":300.6,"y":295.9,"category":"Out","result":"Out","exit_velocity":99.3,"launch_angle":32.5,"distance":321.0},{"x":365.2,"y":265.9,"category":"Out","result":"Out","exit_velocity":91.4,"launch_angle":30.5,"distance":302.0},{"x":277.8,"y":51.7,"category":"Out","result":"Out","exit_velocity":69.6,"launch_angle":-14.9,"distance":15.0},{"x":251.2,"y":88.8,"category":"Single","result":"Single","exit_velocity":83.1,"launch_angle":4.3,"distance":71.0},{"x":321.2,"y":215.2,"category":"Single","result":"Single","exit_velocity":70.6,"launch_angle":27.6,"distance":225.0},{"x":333.0,"y":78.5,"category":"Out","result":"Out","exit_velocity":71.4,"launch_angle":73.7,"distance":82.0},{"x":274.3,"y":53.7,"category":"Out","result":"Error","exit_velocity":91.7,"launch_angle":-8.7,"distance":19.0},{"x":281.4,"y":267.0,"category":"Single","result":"Single","exit_velocity":97.9,"launch_angle":13.5,"distance":284.0},{"x":270.0,"y":60.2,"category":"Single","result":"Single","exit_velocity":96.8,"launch_angle":-5.8,"distance":28.0},{"x":225.2,"y":222.4,"category":"Out","result":"Out","exit_velocity":76.2,"launch_angle":35.3,"distance":238.0},{"x":278.6,"y":92.8,"category":"Out","result":"Out","exit_velocity":80.8,"launch_angle":73.0,"distance":66.0},{"x":269.2,"y":60.8,"category":"Out","result":"Error","exit_velocity":105.5,"launch_angle":-2.5,"distance":29.0},{"x":203.6,"y":152.6,"category":"Double","result":"Double","exit_velocity":101.2,"launch_angle":9.1,"distance":170.0},{"x":256.4,"y":192.0,"category":"Out","result":"Out","exit_velocity":77.1,"launch_angle":50.2,"distance":192.0},{"x":277.5,"y":41.1,"category":"Out","result":"Out","exit_velocity":68.6,"launch_angle":-53.3,"distance":3.0},{"x":278.7,"y":42.2,"category":"Out","result":"Out","exit_velocity":55.4,"launch_angle":-49.8,"distance":3.0},{"x":275.1,"y":44.3,"category":"Out","result":"Out","exit_velocity":92.0,"launch_angle":-31.2,"distance":8.0},{"x":172.3,"y":295.2,"category":"Out","result":"Out","exit_velocity":101.7,"launch_angle":25.9,"distance":346.0},{"x":185.2,"y":333.3,"category":"HomeRun","result":"HomeRun","exit_velocity":99.0,"launch_angle":26.5,"distance":385.0},{"x":221.9,"y":184.6,"category":"Single","result":"Single","exit_velocity":100.1,"launch_angle":11.1,"distance":195.0},{"x":325.5,"y":296.0,"category":"Out","result":"Out","exit_velocity":92.8,"launch_angle":36.5,"distance":325.0},{"x":256.7,"y":102.4,"category":"Out","result":"Out","exit_velocity":56.6,"launch_angle":10.6,"distance":83.0},{"x":305.8,"y":276.1,"category":"Out","result":"Out","exit_velocity":87.5,"launch_angle":23.7,"distance":297.0},{"x":223.6,"y":145.3,"category":"Single","result":"Single","exit_velocity":109.1,"launch_angle":7.7,"distance":149.0},{"x":257.7,"y":62.1,"category":"Double","result":"Double","exit_velocity":105.8,"launch_angle":-1.6,"distance":39.0},{"x":300.9,"y":81.7,"category":"Out","result":"Out","exit_velocity":71.7,"launch_angle":73.4,"distance":58.0},{"x":264.2,"y":58.6,"category":"Out","result":"Out","exit_velocity":89.3,"launch_angle":-3.1,"distance":31.0},{"x":96.0,"y":309.8,"category":"HomeRun","result":"HomeRun","exit_velocity":106.7,"launch_angle":23.7,"distance":408.0},{"x":278.0,"y":42.5,"category":"Out","result":"Out","exit_velocity":63.0,"launch_angle":-46.2,"distance":4.0},{"x":266.9,"y":91.3,"category":"Out","result":"Out","exit_velocity":101.3,"launch_angle":0.6,"distance":66.0},{"x":315.6,"y":148.7,"category":"Single","result":"Single","exit_velocity":57.2,"launch_angle":30.8,"distance":143.0},{"x":272.6,"y":46.1,"category":"Single","result":"Single","exit_velocity":92.4,"launch_angle":-9.8,"distance":12.0},{"x":273.5,"y":55.6,"category":"Out","result":"Out","exit_velocity":72.8,"launch_angle":-11.3,"distance":21.0},{"x":290.2,"y":215.5,"category":"Single","result":"Single","exit_velocity":71.9,"launch_angle":19.6,"distance":220.0},{"x":258.5,"y":289.2,"category":"Out","result":"Out","exit_velocity":84.0,"launch_angle":39.4,"distance":313.0},{"x":276.4,"y":43.7,"category":"Out","result":"Out","exit_velocity":54.4,"launch_angle":-33.5,"distance":6.0},{"x":390.8,"y":267.5,"category":"Out","result":"Out","exit_velocity":94.0,"launch_angle":18.5,"distance":316.0},{"x":269.1,"y":186.4,"category":"Single","result":"Single","exit_velocity":86.6,"launch_angle":9.6,"distance":184.0},{"x":218.1,"y":363.5,"category":"HomeRun","result":"HomeRun","exit_velocity":100.3,"launch_angle":29.9,"distance":412.0},{"x":285.9,"y":62.3,"category":"Single","result":"Single","exit_velocity":102.8,"launch_angle":-5.5,"distance":29.0},{"x":279.0,"y":43.2,"category":"Out","result":"Out","exit_velocity":71.9,"launch_angle":-43.4,"distance":4.0},{"x":278.0,"y":51.8,"category":"Single","result":"Single","exit_velocity":104.7,"launch_angle":-10.9,"distance":15.0},{"x":248.2,"y":263.5,"category":"Single","result":"Single","exit_velocity":100.0,"launch_angle":12.9,"distance":282.0},{"x":142.9,"y":319.8,"category":"HomeRun","result":"HomeRun","exit_velocity":99.3,"launch_angle":23.1,"distance":389.0},{"x":351.0,"y":91.7,"category":"Single","result":"Single","exit_velocity":62.2,"launch_angle":69.1,"distance":110.0}],"rolling_xslg":[{"x":1,"y":0.041},{"x":2,"y":0.068},{"x":3,"y":0.161},{"x":4,"y":0.232},{"x":5,"y":0.251},{"x":6,"y":0.266},{"x":7,"y":0.337},{"x":8,"y":0.396},{"x":9,"y":0.431},{"x":10,"y":0.461},{"x":11,"y":0.43},{"x":12,"y":0.403},{"x":13,"y":0.416},{"x":14,"y":0.426},{"x":15,"y":0.471},{"x":16,"y":0.511},{"x":17,"y":0.504},{"x":18,"y":0.497},{"x":19,"y":0.498},{"x":20,"y":0.498},{"x":21,"y":0.493},{"x":22,"y":0.489},{"x":23,"y":0.49},{"x":24,"y":0.491},{"x":25,"y":0.511},{"x":26,"y":0.528},{"x":27,"y":0.524},{"x":28,"y":0.52},{"x":29,"y":0.52},{"x":30,"y":0.519},{"x":31,"y":0.505},{"x":32,"y":0.491},{"x":33,"y":0.479},{"x":34,"y":0.466},{"x":35,"y":0.461},{"x":36,"y":0.455},{"x":37,"y":0.461},{"x":38,"y":0.466},{"x":39,"y":0.459},{"x":40,"y":0.453},{"x":41,"y":0.451},{"x":42,"y":0.448},{"x":43,"y":0.439},{"x":44,"y":0.429},{"x":45,"y":0.421},{"x":46,"y":0.412},{"x":47,"y":0.416},{"x":48,"y":0.424},{"x":49,"y":0.436},{"x":50,"y":0.427},{"x":51,"y":0.437},{"x":52,"y":0.439},{"x":53,"y":0.443},{"x":54,"y":0.462},{"x":55,"y":0.465},{"x":56,"y":0.485},{"x":57,"y":0.494},{"x":58,"y":0.498},{"x":59,"y":0.499},{"x":60,"y":0.515},{"x":61,"y":0.51},{"x":62,"y":0.518},{"x":63,"y":0.514},{"x":64,"y":0.507},{"x":65,"y":0.52},{"x":66,"y":0.512},{"x":67,"y":0.52},{"x":68,"y":0.516},{"x":69,"y":0.515},{"x":70,"y":0.508},{"x":71,"y":0.504},{"x":72,"y":0.499},{"x":73,"y":0.508},{"x":74,"y":0.515},{"x":75,"y":0.512},{"x":76,"y":0.513},{"x":77,"y":0.522},{"x":78,"y":0.523},{"x":79,"y":0.521},{"x":80,"y":0.521},{"x":81,"y":0.516},{"x":82,"y":0.51},{"x":83,"y":0.504},{"x":84,"y":0.51},{"x":85,"y":0.504},{"x":86,"y":0.509}],"trackman_team":"FLO_PAN","slg_con":0.509,"r":44,"rbi":44,"war_per_55":0.0253,"qab_count":125,"qab_pa":246,"qab_criteria":{"hit":62,"walk":14,"hbp":14,"sacrifice":3,"barrel":14,"eight_pitch":37,"battle_02":12},"qab_productive_out_available":false,"headshot":"gcu_player_assets/andrew-ildefonso-headshot.png","header":"gcu_player_assets/andrew-ildefonso-header.png","header_position":"50.0% 12.9%"},{"name":"Carson Ohland","csv":"Ohland, Carson","position":"OF","source_team":"GRA_CAN","pa":41,"ab":37,"pitches":137,"bats":"L","h":9,"1b":6,"2b":1,"3b":1,"hr":1,"xbh":3,"bb":3,"k":8,"hbp":0,"sac":1,"sb":0,"rbi_proxy":1,"avg":0.24324324324324326,"obp":0.2926829268292683,"slg":0.40540540540540543,"ops":0.6980883322346737,"iso":0.16216216216216217,"woba":0.341,"wrc_plus_proxy":87,"walk_rate":0.07317073170731707,"k_rate":0.1951219512195122,"bb_k":0.375,"swing_rate":0.39416058394160586,"chase_rate":0.1891891891891892,"contact_rate":0.765,"zone_contact_rate":0.846,"whiff_rate":0.235,"avg_ev":74.5,"ev90":98.9,"hard_hit_pct":0.154,"barrel_pct":0.0,"ld_pct":0.0,"gb_pct":0.692,"fb_pct":0.308,"sweet_spot":0.0,"qab":0.439,"fpct":null,"status":"Tracked","avgDisplay":".243","obpDisplay":".293","slgDisplay":".405","opsDisplay":".698","isoDisplay":".162","wobaDisplay":".341","walkRateDisplay":"7.3%","kRateDisplay":"19.5%","bbKDisplay":"0.38","chaseRateDisplay":"18.9%","swingRateDisplay":"39.4%","contactRateDisplay":"79.6%","whiffRateDisplay":"20.4%","avgEvDisplay":"74.5","ev90Display":"100.9","hardHitDisplay":"15.4%","barrelDisplay":"0.0%","ldDisplay":"20.0%","gbDisplay":"53.3%","fbDisplay":"13.3%","sweetDisplay":"23.3%","qabDisplay":"43.9%","fpctDisplay":"--","wrcPlusDisplay":"87","ops_plus":83,"opsPlusDisplay":"83","war":0.11,"owar":0.32,"drs":-2.87,"defensive_runs_saved":-2.87,"framing_runs_saved":0.0,"pitches_framed":0,"stolen_base_runs":0.0,"pickoff_runs":0.0,"throwing_runs":0.0,"infield_gb_runs":0.0,"double_play_runs_start":0.0,"double_play_runs_pivot":0.0,"infield_fb_runs":0.0,"bunt_runs":0.0,"outfield_fb_runs":-2.87,"outfield_arm_runs":0.0,"blocking_runs":0.0,"fld_po":24,"fld_a":null,"fld_e":1,"fld_pct":0.96,"fld_idp":null,"fld_pb":null,"synergy_pos":"LF","trackman_bbe":13,"spray_points":[{"x":343.4,"y":162.1,"category":"Out","result":"Out","exit_velocity":79.2,"launch_angle":57.9,"distance":172.0},{"x":277.7,"y":42.6,"category":"Out","result":"Out","exit_velocity":76.6,"launch_angle":-46.5,"distance":4.0},{"x":232.6,"y":149.3,"category":"Single","result":"Single","exit_velocity":74.0,"launch_angle":12.7,"distance":149.0},{"x":281.1,"y":52.7,"category":"Single","result":"Single","exit_velocity":99.9,"launch_angle":-10.2,"distance":16.0},{"x":289.4,"y":214.0,"category":"Single","result":"Single","exit_velocity":69.0,"launch_angle":41.6,"distance":218.0},{"x":288.2,"y":71.8,"category":"Out","result":"Out","exit_velocity":101.0,"launch_angle":-4.3,"distance":41.0},{"x":279.7,"y":150.7,"category":"Single","result":"Single","exit_velocity":94.7,"launch_angle":6.5,"distance":138.0},{"x":280.8,"y":46.4,"category":"Out","result":"Out","exit_velocity":63.1,"launch_angle":-19.0,"distance":8.0},{"x":282.3,"y":45.3,"category":"Out","result":"Sacrifice","exit_velocity":28.6,"launch_angle":-30.1,"distance":7.0},{"x":320.3,"y":238.6,"category":"Out","result":"Out","exit_velocity":85.3,"launch_angle":48.2,"distance":253.0},{"x":281.1,"y":42.3,"category":"Out","result":"Out","exit_velocity":75.0,"launch_angle":-35.1,"distance":3.0},{"x":281.0,"y":42.4,"category":"Out","result":"Out","exit_velocity":76.0,"launch_angle":-45.1,"distance":3.0},{"x":266.3,"y":250.4,"category":"Out","result":"Out","exit_velocity":79.0,"launch_angle":44.8,"distance":264.0},{"x":244.7,"y":271.0,"category":"Triple","result":"Triple","exit_velocity":99.7,"launch_angle":16.2,"distance":292.0},{"x":256.5,"y":108.9,"category":"Out","result":"Out","exit_velocity":79.0,"launch_angle":7.0,"distance":91.0},{"x":458.9,"y":284.2,"category":"HomeRun","result":"HomeRun","exit_velocity":104.1,"launch_angle":24.0,"distance":378.0},{"x":204.5,"y":325.9,"category":"Double","result":"Double","exit_velocity":95.9,"launch_angle":21.5,"distance":370.0},{"x":259.3,"y":75.4,"category":"Out","result":"Out","exit_velocity":90.8,"launch_angle":0.0,"distance":51.0},{"x":315.2,"y":89.4,"category":"Single","result":"Single","exit_velocity":99.6,"launch_angle":3.3,"distance":76.0},{"x":393.8,"y":234.0,"category":"Out","result":"Out","exit_velocity":92.6,"launch_angle":49.9,"distance":281.0},{"x":290.5,"y":75.5,"category":"Out","result":"Out","exit_velocity":102.1,"launch_angle":0.6,"distance":46.0},{"x":281.2,"y":40.9,"category":"Out","result":"Out","exit_velocity":66.8,"launch_angle":-60.2,"distance":2.0},{"x":357.8,"y":223.8,"category":"Out","result":"Out","exit_velocity":74.4,"launch_angle":25.4,"distance":249.0},{"x":297.6,"y":109.8,"category":"Out","result":"Out","exit_velocity":100.9,"launch_angle":2.6,"distance":90.0},{"x":189.5,"y":178.1,"category":"Single","result":"Single","exit_velocity":92.1,"launch_angle":10.6,"distance":206.0},{"x":269.8,"y":307.1,"category":"Out","result":"Out","exit_velocity":88.2,"launch_angle":23.3,"distance":334.0},{"x":285.4,"y":87.2,"category":"Out","result":"Out","exit_velocity":67.4,"launch_angle":4.8,"distance":59.0},{"x":357.8,"y":177.3,"category":"Out","result":"Out","exit_velocity":76.3,"launch_angle":61.6,"distance":197.0},{"x":279.2,"y":46.6,"category":"Out","result":"Out","exit_velocity":31.5,"launch_angle":-23.4,"distance":8.0}],"rolling_xslg":[{"x":1,"y":0.262},{"x":2,"y":0.27},{"x":3,"y":0.275},{"x":4,"y":0.241},{"x":5,"y":0.214},{"x":6,"y":0.203},{"x":7,"y":0.194},{"x":8,"y":0.178},{"x":9,"y":0.164}],"trackman_team":"GRA_CAN","slg_con":0.164,"r":11,"rbi":7,"war_per_55":0.002,"qab_count":18,"qab_pa":41,"qab_criteria":{"hit":9,"walk":3,"hbp":0,"sacrifice":1,"barrel":2,"eight_pitch":5,"battle_02":3},"qab_productive_out_available":false,"headshot":"gcu_player_assets/carson-ohland-headshot.jpeg","header":"gcu_player_assets/carson-ohland-header.webp","header_position":"50.0% 40.5%"}],"balance":[{"name":"Contact","score":59},{"name":"Power","score":65},{"name":"Speed","score":25},{"name":"Defense","score":70},{"name":"Discipline","score":54},{"name":"Versatility","score":58},{"name":"L/R Balance","score":62},{"name":"Depth","score":71}]};
+    const RANKINGS = {"ops": {"rank": 169, "total": 308, "val": ".800", "label": "OPS", "note": "listed roster"}, "avg": {"rank": 153, "total": 308, "val": ".277", "label": "AVG", "note": "listed roster"}, "bb_rate": {"rank": 293, "total": 308, "val": "9.0%", "label": "Walk rate", "note": "team PA"}, "k_rate": {"rank": 122, "total": 308, "val": "18.7%", "label": "K rate", "note": "lower is better"}, "xbh_ab": {"rank": 161, "total": 308, "val": "8.7%", "label": "XBH rate", "note": "XBH / AB"}, "hard_hit": {"rank": 142, "total": 297, "val": "32.8%", "label": "Hard-hit %", "note": "95+ mph BBE"}, "contact": {"rank": 136, "total": 297, "val": "75.8%", "label": "Contact %", "note": "swings with contact"}, "chase": {"rank": 216, "total": 297, "val": "26.4%", "label": "Chase rate", "note": "lower is better"}, "def_conv": {"rank": 157, "total": 297, "val": "96.5%", "label": "Def conv", "note": "BBE outs / opp"}, "grinder": {"rank": 110, "total": 192, "val": "7.0%", "label": "Grinder %", "note": "7+ pitch PA"}, "grind_02": {"rank": 123, "total": 192, "val": "8.1%", "label": "4+ after 0-2", "note": "% of 0-2 counts"}, "lo_obp": {"rank": 103, "total": 192, "val": ".370", "label": "Leadoff OBP", "note": "1st PA of inning"}, "tworbi": {"rank": 153, "total": 192, "val": "10.2%", "label": "2-out RBI %", "note": "runs / 2-out PA"}, "risp_ops": {"rank": 145, "total": 192, "val": ".760", "label": "RISP OPS", "note": "2nd / 3rd on base"}, "xbh_bbe": {"rank": 104, "total": 192, "val": "11.6%", "label": "XBH rate (TM)", "note": "XBH / BBE"}, "war_55": {"rank": 53, "total": 265, "val": "1.97", "label": "WAR / 55", "note": "roster normalized"}, "qab": {"rank": 1, "total": 224, "val": "51.8%", "label": "QAB %", "note": "roster composite \u00b7 609 / 1176 PA"}};
+    const FIELDING_PERCENTILES = {"war":{"p05":-0.4,"p20":-0.07,"p40":0.13,"p60":0.45,"p80":1.14,"p95":2.4,"hi":true},"war_per_55":{"p05":-0.0073,"p20":-0.0013,"p40":0.0024,"p60":0.0082,"p80":0.0207,"p95":0.0436,"hi":true},"drs":{"p05":-1.84,"p20":-0.24,"p40":0.03,"p60":0.43,"p80":2.074,"p95":7.462,"hi":true},"defensive_runs_saved":{"p05":-1.67,"p20":-0.32,"p40":0.06,"p60":0.39,"p80":1.46,"p95":6.13,"hi":true},"framing_runs_saved":{"p05":0.0,"p20":0.0,"p40":0.0,"p60":0.0,"p80":0.0,"p95":0.0,"hi":true},"stolen_base_runs":{"p05":0.0,"p20":0.0,"p40":0.0,"p60":0.0,"p80":0.0,"p95":0.0,"hi":true},"pickoff_runs":{"p05":0.0,"p20":0.0,"p40":0.0,"p60":0.0,"p80":0.0,"p95":0.0,"hi":true},"throwing_runs":{"p05":0.0,"p20":0.0,"p40":0.0,"p60":0.0,"p80":0.0,"p95":0.0,"hi":true},"infield_gb_runs":{"p05":-0.33,"p20":0.0,"p40":0.0,"p60":0.09,"p80":0.49,"p95":4.15,"hi":true},"double_play_runs_start":{"p05":-0.03,"p20":0.0,"p40":0.0,"p60":0.0,"p80":0.0,"p95":0.27,"hi":true},"double_play_runs_pivot":{"p05":-0.02,"p20":0.0,"p40":0.0,"p60":0.0,"p80":0.0,"p95":0.3,"hi":true},"infield_fb_runs":{"p05":0.0,"p20":0.0,"p40":0.0,"p60":0.0,"p80":0.0,"p95":0.06,"hi":true},"bunt_runs":{"p05":-0.56,"p20":0.0,"p40":0.0,"p60":0.0,"p80":0.02,"p95":0.58,"hi":true},"outfield_fb_runs":{"p05":-1.4235,"p20":0.0,"p40":0.0,"p60":0.0,"p80":0.0,"p95":1.07,"hi":true},"outfield_arm_runs":{"p05":0.0,"p20":0.0,"p40":0.0,"p60":0.0,"p80":0.0,"p95":0.42,"hi":true},"blocking_runs":{"p05":0.0,"p20":0.0,"p40":0.0,"p60":0.0,"p80":0.0,"p95":0.19,"hi":true},"fld_pct":{"p05":0.667,"p20":0.909,"p40":0.97,"p60":0.993,"p80":1.0,"p95":1.0,"hi":true},"fld_e":{"p05":1.0,"p20":1.0,"p40":2.0,"p60":3.0,"p80":6.0,"p95":57.7,"hi":false}};
+
+    // ── Percentile thresholds: D1 2026 qualified hitters ──
+    // Table cell coloring uses T; modal bars use MT (superset)
+    const MT = {
+      avg:               { p20:.255,  p40:.281,  p60:.300,  p80:.325,  hi:true  },
+      obp:               { p20:.353,  p40:.380,  p60:.404,  p80:.431,  hi:true  },
+      slg:               { p20:.374,  p40:.428,  p60:.480,  p80:.541,  hi:true  },
+      ops:               { p20:.742,  p40:.814,  p60:.879,  p80:.957,  hi:true  },
+      woba:              { p20:.330,  p40:.358,  p60:.384,  p80:.415,  hi:true  },
+      wrc_plus_proxy:    { p20:77,    p40:91,    p60:105,   p80:120,   hi:true  },
+      iso:               { p20:.100,  p40:.140,  p60:.180,  p80:.230,  hi:true  },
+      walk_rate:         { p20:.082,  p40:.100,  p60:.119,  p80:.141,  hi:true  },
+      k_rate:            { p20:.129,  p40:.162,  p60:.193,  p80:.231,  hi:false },
+      bb_k:              { p20:.25,   p40:.50,   p60:.75,   p80:1.10,  hi:true  },
+      chase_rate:        { p20:.250,  p40:.290,  p60:.330,  p80:.370,  hi:false },
+      swing_rate:        { p20:.390,  p40:.440,  p60:.480,  p80:.520,  hi:false },
+      contact_rate:      { p20:.700,  p40:.750,  p60:.790,  p80:.840,  hi:true  },
+      zone_contact_rate: { p20:.750,  p40:.800,  p60:.840,  p80:.880,  hi:true  },
+      whiff_rate:        { p20:.100,  p40:.150,  p60:.200,  p80:.260,  hi:false },
+      avg_ev:            { p20:83,    p40:86,    p60:88,    p80:91,    hi:true  },
+      ev90:              { p20:96,    p40:99,    p60:102,   p80:106,   hi:true  },
+      hard_hit_pct:      { p20:.280,  p40:.350,  p60:.420,  p80:.500,  hi:true  },
+      barrel_pct:        { p20:.010,  p40:.025,  p60:.045,  p80:.075,  hi:true  },
+      ld_pct:            { p20:.170,  p40:.210,  p60:.250,  p80:.300,  hi:true  },
+      gb_pct:            { p20:.350,  p40:.420,  p60:.460,  p80:.510,  hi:false },
+      fb_pct:            { p20:.150,  p40:.200,  p60:.250,  p80:.310,  hi:true  },
+      sweet_spot:        { p20:.230,  p40:.280,  p60:.330,  p80:.390,  hi:true  },
+    };
+
+    // Alias T → MT for table cell use
+    const T = MT;
+
+    // ── Piecewise-linear percentile from p20/p40/p60/p80 anchors ──
+    function getPercentile(val, key) {
+      if (val === null || val === undefined || !MT[key]) return null;
+      const m = MT[key];
+      const v = Number(val);
+      if (isNaN(v)) return null;
+      // Build [value, pct_in_distribution] anchors (ascending by value)
+      const pts = [
+        [m.p20 * 0.55, 3],
+        [m.p20, 20],
+        [m.p40, 40],
+        [m.p60, 60],
+        [m.p80, 80],
+        [m.p80 * 1.45, 97],
+      ];
+      let raw;
+      if (v <= pts[0][0]) raw = 1;
+      else if (v >= pts[pts.length-1][0]) raw = 99;
+      else {
+        for (let i = 0; i < pts.length - 1; i++) {
+          const [v0, p0] = pts[i], [v1, p1] = pts[i+1];
+          if (v >= v0 && v <= v1) {
+            const t = (v - v0) / (v1 - v0);
+            raw = p0 + t * (p1 - p0);
+            break;
+          }
+        }
+      }
+      raw = Math.round(Math.max(1, Math.min(99, raw ?? 50)));
+      return m.hi ? raw : 100 - raw;
+    }
+
+    // ── MassApp hitter leaderboard color scale ──
+    function barColor(pct) {
+      let frac = Math.max(0, Math.min(1, Number(pct || 0) / 100));
+      const a = [164, 117, 151], m = [239, 231, 218], b = [168, 145, 58];
+      const from = frac <= 0.5 ? a : m;
+      const to = frac <= 0.5 ? m : b;
+      const t = frac <= 0.5 ? frac * 2 : (frac - 0.5) * 2;
+      const rgb = from.map((x, i) => Math.round(x + (to[i] - x) * t));
+      return `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
+    }
+
+    function textColorForBg(bg) {
+      const nums = String(bg).match(/\d+/g);
+      if (!nums || nums.length < 3) return "#17202a";
+      const lum = (0.299 * Number(nums[0]) + 0.587 * Number(nums[1]) + 0.114 * Number(nums[2])) / 255;
+      return lum > 0.55 ? "#17202a" : "#fff";
+    }
+
+    function fieldingPercentile(value, key) {
+      const m = FIELDING_PERCENTILES[key];
+      const v = Number(value);
+      if (!m || value === null || value === undefined || Number.isNaN(v)) return null;
+      const anchors = [
+        [Number(m.p05), 5],
+        [Number(m.p20), 20],
+        [Number(m.p40), 40],
+        [Number(m.p60), 60],
+        [Number(m.p80), 80],
+        [Number(m.p95), 95],
+      ].filter(([x]) => Number.isFinite(x)).sort((a,b) => a[0] - b[0]);
+      if (!anchors.length) return null;
+      let raw;
+      if (v <= anchors[0][0]) raw = anchors[0][1];
+      else if (v >= anchors[anchors.length - 1][0]) raw = anchors[anchors.length - 1][1];
+      else {
+        for (let i = 0; i < anchors.length - 1; i++) {
+          const [v0, p0] = anchors[i], [v1, p1] = anchors[i + 1];
+          if (v >= v0 && v <= v1) {
+            raw = v1 === v0 ? Math.max(p0, p1) : p0 + ((v - v0) / (v1 - v0)) * (p1 - p0);
+            break;
+          }
+        }
+      }
+      const pct = Math.round(Math.max(1, Math.min(99, raw ?? 50)));
+      return m.hi === false ? 100 - pct : pct;
+    }
+
+    function fieldingStyle(value, key) {
+      const pct = fieldingPercentile(value, key);
+      if (pct === null) return { pct:null, style:"" };
+      const color = barColor(pct);
+      return {
+        pct,
+        style:`background:${color};color:${textColorForBg(color)};border-color:${color}`
+      };
+    }
+
+    function ordinal(n) {
+      if (n === null || n === undefined) return '';
+      const s = ['th','st','nd','rd'], v = n % 100;
+      return n + (s[(v-20)%10] || s[v] || s[0]);
+    }
+
+    // ── Render one Baseball Savant-style bar row ──
+    function svBar(label, rawVal, key, displayVal) {
+      const pct    = getPercentile(rawVal, key);
+      const noData = displayVal === "--" || displayVal === null || displayVal === undefined;
+      const color  = (pct !== null && !noData) ? barColor(pct) : '#ede8f8';
+      const fill   = (pct !== null && !noData) ? pct : 0;
+      const circleNum = (pct !== null && !noData) ? pct : '';
+      return `<div class="sv-stat">
+        <div class="sv-header">
+          <span class="sv-label">${label}</span>
+        </div>
+        <div class="sv-value${noData ? ' nd' : ''}">${noData ? '--' : displayVal}</div>
+        <div class="sv-bar-row">
+          <div class="sv-track"><div class="sv-fill" style="width:${fill}%;background:${color}"></div></div>
+          <div class="sv-circle" style="background:${circleNum !== '' ? color : '#d8d0ea'}">${circleNum}</div>
+        </div>
+      </div>`;
+    }
+
+    // ── Table cell coloring ──
+    function cellClass(val, key) {
+      if (val === null || val === undefined || val === "" || !T[key]) return "c-avg";
+      const t = T[key], hi = t.hi;
+      if (hi) {
+        if (val >= t.p80) return "c-elite";
+        if (val >= t.p60) return "c-good";
+        if (val >= t.p40) return "c-avg";
+        if (val >= t.p20) return "c-poor";
+        return "c-bad";
+      } else {
+        if (val <= t.p20) return "c-elite";
+        if (val <= t.p40) return "c-good";
+        if (val <= t.p60) return "c-avg";
+        if (val <= t.p80) return "c-poor";
+        return "c-bad";
+      }
+    }
+    function cc(val, key, display) {
+      if (display === "--" || display === null || display === undefined) return display || "--";
+      const cls = cellClass(val, key);
+      return cls === "c-avg" ? display : `<span class="${cls}">${display}</span>`;
+    }
+
+    // ── KPI tiles ──
+    const kpis = [
+      ["Team OBP", DATA.team.obp, "listed roster only"],
+      ["Team OPS", DATA.team.ops, "AVG " + DATA.team.avg],
+      ["K Rate",   DATA.team.k_rate,   "team PA"],
+      ["Walk Rate",DATA.team.bb_rate,  "team PA"],
+      ["Hard-Hit %",DATA.team.hard_hit_pct,"95+ mph BBE"],
+      ["Chase Rate",DATA.team.chase_rate,"zone proxy"],
+      ["Contact %", DATA.team.contact_rate,"swings w/ contact"],
+      ["Def Conv.", DATA.team.defensive_conversion,"team proxy"],
+      ["QAB %",    DATA.team.qab,       `${DATA.team.qab_count || "--"} / ${DATA.team.qab_pa || "--"} tracked PA`],
+      ["XBH Rate", DATA.team.xbh_rate,  "XBH / AB"],
+      ["SB",       DATA.team.baserunning,"notes only"],
+    ];
+    document.getElementById("kpis").innerHTML = kpis.map(k =>
+      `<article class="tile"><div class="label">${k[0]}</div><div class="value">${k[1]}</div><div class="hint">${k[2]}</div></article>`
+    ).join("");
+
+    // ── D1 Rankings ──
+    function rankPercent(rank, total) {
+      return Math.round((1 - ((rank - 1) / Math.max(1, total - 1))) * 100);
+    }
+    function rankTone(rank, total) {
+      const p = rank / total;
+      return p <= .25 ? "top" : p <= .55 ? "solid" : "watch";
+    }
+    const rkSections = [
+      { title:"Standard batting", meta:"d1baseball.com · 308 teams", keys:["ops","avg","bb_rate","k_rate","xbh_ab"] },
+      { title:"Pitch / contact", meta:"Trackman · 297 teams", keys:["hard_hit","contact","chase","def_conv"] },
+      { title:"Situational", meta:"Trackman · 192 teams · 400+ PA", keys:["grinder","grind_02","lo_obp","tworbi","risp_ops","xbh_bbe"] },
+      { title:"Quality at-bat", meta:"Trackman raw · 400+ PA qualified pool", keys:["qab"] },
+      { title:"Roster value", meta:"d1baseball.com WAR · 265 teams", keys:["war_55"] },
+    ];
+    function makeRankCard(r) {
+      const pct = rankPercent(r.rank, r.total);
+      const valStr = typeof r.val === "number" && r.val < 2 ? r.val.toFixed(3).replace(/^0\./,".") : r.val;
+      const color = barColor(pct);
+      const txtColor = textColorForBg(color);
+      return `<article class="rank-card ${rankTone(r.rank, r.total)}">
+        <div class="rank-top">
+          <div class="r-label">${esc(r.label)}</div>
+          <div class="r-rank-note">#${r.rank} / ${r.total}</div>
+        </div>
+        <div class="rank-main">
+          <div class="rank-track">
+            <span class="rank-fill" style="width:${pct}%;background:${color}"></span>
+            <span class="r-percent" style="left:${pct}%;background:${color};color:${txtColor}">${pct}</span>
+          </div>
+        </div>
+        <div>
+          <div class="r-val">${esc(valStr)}</div>
+          <div class="r-note">${esc(r.note || ordinal(pct) + ' pct')}</div>
+        </div>
+      </article>`;
+    }
+    document.getElementById("rankings").innerHTML =
+      rkSections.map(sec =>
+        `<section class="rank-group">
+          <div class="rank-group-title">${esc(sec.title)}<span>${esc(sec.meta)}</span></div>
+          <div class="rank-group-grid">${sec.keys.filter(k => RANKINGS[k]).map(k => makeRankCard(RANKINGS[k])).join("")}</div>
+        </section>`
+      ).join("") +
+      `<section class="rank-group">
+        <div class="rank-group-title">No D1 comparison<span>Internal / notes only</span></div>
+        <div class="rank-group-grid">
+          <article class="rank-card watch">
+            <div class="rank-top"><div class="r-label">SB</div><div class="r-rank-note">#243 / 308</div></div>
+            <div class="rank-main"><div class="rank-track"><span class="rank-fill" style="width:21%;background:${barColor(21)}"></span><span class="r-percent" style="left:21%;background:${barColor(21)};color:${textColorForBg(barColor(21))}">21</span></div></div>
+            <div><div class="r-val">46</div><div class="r-note">returners only · notes</div></div>
+          </article>
+        </div>
+      </section>`;
+
+    // ── Modal ──
+    const overlay   = document.getElementById("modalOverlay");
+    const panel     = document.getElementById("modalPanel");
+    const modalClose = document.getElementById("modalClose");
+
+    function esc(value) {
+      return String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+    }
+
+    function initials(name) {
+      return String(name || '').split(/\s+/).filter(Boolean).slice(0,2).map(p => p[0]).join('').toUpperCase();
+    }
+
+    function pctText(v) {
+      return (v === null || v === undefined || Number.isNaN(Number(v))) ? "--" : (Number(v) * 100).toFixed(1) + "%";
+    }
+
+    function numText(v, d=1, suffix="") {
+      return (v === null || v === undefined || Number.isNaN(Number(v))) ? "--" : Number(v).toFixed(d) + suffix;
+    }
+
+    function statText(v, d=3) {
+      if (v === null || v === undefined || Number.isNaN(Number(v))) return "--";
+      return Number(v).toFixed(d).replace(/^0\./,'.');
+    }
+
+    function signedText(v, d=2) {
+      if (v === null || v === undefined || Number.isNaN(Number(v))) return "--";
+      const n = Number(v);
+      return `${n > 0 ? "+" : ""}${n.toFixed(d)}`;
+    }
+
+    function plainNum(v, d=0) {
+      if (v === null || v === undefined || Number.isNaN(Number(v))) return "--";
+      return Number(v).toFixed(d);
+    }
+
+    function fieldPctText(v) {
+      if (v === null || v === undefined || Number.isNaN(Number(v))) return "--";
+      return Number(v).toFixed(3).replace(/^0\./,'.');
+    }
+
+    function bbeCount(player) {
+      const count = Number(player?.trackman_bbe);
+      return Number.isFinite(count) && count > 0 ? Math.round(count) : 0;
+    }
+
+    function bbeText(player) {
+      const count = bbeCount(player);
+      if (count > 0) return `${count} BBE`;
+      const hasBattedBallMetrics = [player?.avg_ev, player?.ev90, player?.hard_hit_pct].some(v => v !== null && v !== undefined && !Number.isNaN(Number(v)));
+      return hasBattedBallMetrics ? "BBE count unavailable" : "0 BBE";
+    }
+
+    function percentileRow(label, raw, key, display) {
+      const p = key ? getPercentile(raw, key) : null;
+      const pctVal = p ?? 0;
+      const color = p === null ? "#d8d0ea" : barColor(p);
+      const txtColor = textColorForBg(color);
+      const noData = display === "--" || display === null || display === undefined;
+      return `<div class="percentile-row">
+        <div class="percentile-label">${esc(label)}</div>
+        <div class="percentile-track">
+          <div class="percentile-fill" style="width:${noData ? 0 : pctVal}%;background:${color}"></div>
+          ${noData ? "" : `<div class="percentile-badge" style="left:${pctVal}%;background:${color};color:${txtColor}">${pctVal}</div>`}
+        </div>
+        <div class="percentile-value">${esc(display ?? "--")}</div>
+      </div>`;
+    }
+    function teamRankBar(key) {
+      const r = RANKINGS[key];
+      if (!r) return "";
+      const pct = rankPercent(r.rank, r.total);
+      const color = barColor(pct);
+      const valStr = typeof r.val === "number" && r.val < 2 ? r.val.toFixed(3).replace(/^0\./,".") : r.val;
+      return `<div class="sv-stat team-rank-stat">
+        <div class="sv-header">
+          <span class="sv-label">${esc(r.label)} <span>${esc(r.note || "")}</span></span>
+          <span class="sv-pct">#${r.rank} / ${r.total}</span>
+        </div>
+        <div class="sv-value"><span>${esc(valStr)}</span><small>${pct}th</small></div>
+        <div class="sv-bar-row">
+          <div class="sv-track"><div class="sv-fill" style="width:${pct}%;background:${color}"></div></div>
+          <div class="sv-circle" style="background:${color};color:${textColorForBg(color)}">${pct}</div>
+        </div>
+      </div>`;
+    }
+    function modalTeamRankings() {
+      const keys = ["ops","avg","bb_rate","k_rate","xbh_ab","hard_hit","contact","chase","def_conv","qab","war_55"];
+      return `<div class="modal-rankings">
+        <div class="modal-rankings-title">2026 D1 Team Rankings</div>
+        ${keys.filter(k => RANKINGS[k]).map(teamRankBar).join("")}
+      </div>`;
+    }
+    function internalStatBar(label, displayVal, note) {
+      const noData = displayVal === "--" || displayVal === null || displayVal === undefined;
+      return `<div class="sv-stat team-rank-stat">
+        <div class="sv-header">
+          <span class="sv-label">${esc(label)}</span>
+          <span class="sv-pct">Internal</span>
+        </div>
+        <div class="sv-value${noData ? ' nd' : ''}"><span>${esc(noData ? "--" : displayVal)}</span><small>No D1 rank</small></div>
+        <div class="sv-bar-row">
+          <div class="sv-track"><div class="sv-fill" style="width:0%;background:#d8d0ea"></div></div>
+          <div class="sv-circle" style="background:#d8d0ea;color:var(--purple-2)">--</div>
+        </div>
+        <div class="team-rank-note">${esc(note)}</div>
+      </div>`;
+    }
+    function playerTeamRankingStats(player) {
+      const rows = [
+        ["Walk rate", player.walk_rate, "walk_rate", player.walkRateDisplay],
+        ["K rate", player.k_rate, "k_rate", player.kRateDisplay],
+        ["Hard-hit %", player.hard_hit_pct, "hard_hit_pct", player.hardHitDisplay],
+        ["Contact %", player.contact_rate, "contact_rate", player.contactRateDisplay],
+        ["Chase rate", player.chase_rate, "chase_rate", player.chaseRateDisplay],
+      ].map(r => svBar(...r)).join("");
+      return `<div class="player-d1-view" hidden>
+        <div class="percentile-group-title">Player Stats From Team Rankings</div>
+        <div class="sv-cols">${rows}</div>
+        ${internalStatBar("QAB %", player.qabDisplay, `${player.qab_count ?? "--"} / ${player.qab_pa ?? "--"} tracked PA. Productive-out runner movement is unavailable; there is no D1-wide QAB rank source in this page.`)}
+      </div>`;
+    }
+
+    function basicStats(player) {
+      const rows = [
+        ["Batting Average (AVG)", player.avgDisplay],
+        ["On-Base Percentage (OBP)", player.obpDisplay],
+        ["Slugging Percentage (SLG)", player.slgDisplay],
+        ["OPS", player.opsDisplay],
+        ["Runs Scored", player.r ?? player.runs ?? "--"],
+        ["RBIs", player.rbi_proxy ?? player.rbi ?? "--"],
+        ["Extra-base hits", player.xbh ?? "--"],
+        ["Walks", player.bb ?? "--"],
+        ["Strikeouts", player.k ?? "--"],
+      ];
+      return `<div class="basic-stats">
+        ${rows.map(([label, value]) => `<div class="basic-stat-row"><span>${esc(label)}</span><span>${esc(value ?? "--")}</span></div>`).join("")}
+      </div>
+      <div class="trackman-strip"><span>${esc(player.trackman_team || "--")}</span><span>${esc(bbeText(player))}</span><span>${numText(player.avg_ev,1," mph")} EV</span></div>`;
+    }
+
+    function bioPanel(player) {
+      const bats = player.bats || "--";
+      const pos = player.position || "--";
+      const school = player.status || "Tracked";
+      const headerPosition = player.header_position || "center top";
+      const headerSize = player.header_size || "cover";
+      const heroStyle = player.header
+        ? ` style="background-image:linear-gradient(180deg,rgba(255,255,255,.04),rgba(20,12,40,.34)),url('${esc(player.header)}');background-position:center,${esc(headerPosition)};background-size:cover,${esc(headerSize)};background-repeat:no-repeat"`
+        : "";
+      const portrait = player.headshot
+        ? `<img class="headshot-photo" src="${esc(player.headshot)}" alt="${esc(player.name)} headshot">`
+        : `<div class="headshot-placeholder">${esc(initials(player.name))}</div>`;
+      return `<section class="player-sheet-panel">
+        <div class="bio-hero"${heroStyle}>${portrait}</div>
+        <div class="bio-name">${esc(player.name)}</div>
+        <div class="bio-meta">
+          ${esc(pos)} | Grand Canyon<br>
+          Bats: ${esc(bats)} | PA: ${esc(player.pa ?? "--")}<br>
+          ${esc(school)}
+        </div>
+        ${basicStats(player)}
+      </section>`;
+    }
+
+    function percentilePanel(player) {
+      const valueRows = [
+        ["wOBA", player.woba, "woba", player.wobaDisplay],
+        ["wRC+", player.wrc_plus_proxy, "wrc_plus_proxy", player.wrcPlusDisplay],
+        ["OPS+", player.ops_plus, "wrc_plus_proxy", player.opsPlusDisplay],
+      ].map(r => percentileRow(...r)).join("");
+      const battingRows = [
+        ["AVG", player.avg, "avg", player.avgDisplay],
+        ["OBP", player.obp, "obp", player.obpDisplay],
+        ["SLG", player.slg, "slg", player.slgDisplay],
+        ["OPS", player.ops, "ops", player.opsDisplay],
+        ["ISO", player.iso, "iso", player.isoDisplay],
+        ["BB/K", player.bb_k, "bb_k", numText(player.bb_k, 2)],
+        ["Chase %", player.chase_rate, "chase_rate", pctText(player.chase_rate)],
+        ["Whiff %", player.whiff_rate, "whiff_rate", pctText(player.whiff_rate)],
+        ["Zone Contact %", player.zone_contact_rate, "zone_contact_rate", pctText(player.zone_contact_rate)],
+      ].map(r => percentileRow(...r)).join("");
+      const battedRows = [
+        ["xSLG Contact", player.slg_con, "slg", statText(player.slg_con)],
+        ["Avg Exit Velo", player.avg_ev, "avg_ev", numText(player.avg_ev, 1)],
+        ["90th Pct EV", player.ev90, "ev90", numText(player.ev90, 1)],
+        ["Hard-Hit %", player.hard_hit_pct, "hard_hit_pct", pctText(player.hard_hit_pct)],
+        ["Barrel %", player.barrel_pct, "barrel_pct", pctText(player.barrel_pct)],
+        ["Line Drive %", player.ld_pct, "ld_pct", pctText(player.ld_pct)],
+        ["LA SwSp%", player.sweet_spot, "sweet_spot", pctText(player.sweet_spot)],
+      ].map(r => percentileRow(...r)).join("");
+      return `<section class="player-sheet-panel">
+        <div class="percentile-title">2026 D1 Percentile Rankings</div>
+        <div class="percentile-switch">
+          <button type="button" class="active" data-percentile-mode="percentiles">Percentiles</button>
+          <button type="button" data-percentile-mode="team-stats">Team Rank Stats</button>
+        </div>
+        <div class="player-percentile-view">
+          <div class="percentile-group-title">Value</div>${valueRows}
+          <div class="percentile-group-title">Batting</div>${battingRows}
+          <div class="percentile-group-title">Batted Ball</div>${battedRows}
+          ${modalTeamRankings()}
+        </div>
+        ${playerTeamRankingStats(player)}
+      </section>`;
+    }
+
+    const sprayColors = { HomeRun:"#d92b75", Triple:"#f0b429", Double:"#7156d9", Single:"#ff6a00", Out:"#8f8f8f" };
+    const sprayLabels = { HomeRun:"HOME RUN", Triple:"TRIPLE", Double:"DOUBLE", Single:"SINGLE", Out:"OUT" };
+    function fieldPoint(point) {
+      return `${280 + Number(point.x || 0) * 0.8},${40 + Number(point.y || 0) * 0.8}`;
+    }
+    function polarPoint(angleDeg, distanceFt) {
+      const a = angleDeg * Math.PI / 180;
+      return `${280 + Math.sin(a) * distanceFt * 0.8},${40 + Math.cos(a) * distanceFt * 0.8}`;
+    }
+    function renderSprayChart(player) {
+      const points = player.spray_points || [];
+      if (!points.length) return `<div class="chart-empty">No spray chart coordinates found for this player yet.</div>`;
+      const fence = [
+        {x:-226.1,y:229.1}, {x:-71.0,y:388.9}, {x:102.8,y:372.2}, {x:233.6,y:235.7}
+      ].map(fieldPoint).join(" ");
+      const infieldArc = Array.from({length:72}, (_, i) => polarPoint(-50 + (100*i/71), 165)).join(" ");
+      const dots = points.map(p => `<circle cx="${p.x}" cy="${p.y}" r="${p.category === 'HomeRun' ? 5.5 : 4.8}" fill="${sprayColors[p.category] || sprayColors.Out}" stroke="#222" stroke-width="1"><title>${esc(p.result)} | ${p.exit_velocity} mph | ${p.launch_angle} deg | ${p.distance} ft</title></circle>`).join("");
+      const legend = ["Single","Double","Triple","HomeRun"].map(k => `<span><i class="legend-dot" style="background:${sprayColors[k]}"></i>${sprayLabels[k]}</span>`).join("");
+      return `<div class="spray-legend">${legend}</div>
+        <svg class="spray-svg" viewBox="0 0 560 430" aria-label="Hits spray chart">
+          <g transform="rotate(180 280 215)">
+            <polygon points="280,40 ${fence} 280,40" fill="#b6e3df" opacity=".95" stroke="#e6e6e6" stroke-width="2"/>
+            <polyline points="${fence}" fill="none" stroke="#e4e4e4" stroke-width="8"/>
+            <line x1="280" y1="40" x2="99" y2="223" stroke="#e6e6e6" stroke-width="2"/>
+            <line x1="280" y1="40" x2="467" y2="229" stroke="#e6e6e6" stroke-width="2"/>
+            <polygon points="${polarPoint(45,90)} ${polarPoint(0,127.28)} ${polarPoint(-45,90)}" fill="#fff" opacity=".72"/>
+            <polyline points="${infieldArc}" fill="none" stroke="#fff" stroke-width="8" opacity=".75"/>
+            <circle cx="280" cy="88.4" r="8" fill="#fff"/>
+            <rect x="331" y="88" width="10" height="10" fill="#fff" transform="rotate(45 336 93)"/>
+            <rect x="275" y="137" width="10" height="10" fill="#fff" transform="rotate(45 280 142)"/>
+            <rect x="219" y="88" width="10" height="10" fill="#fff" transform="rotate(45 224 93)"/>
+            <path d="M273 38 L287 38 L287 48 L280 55 L273 48 Z" fill="#fff"/>
+            ${dots}
+          </g>
+        </svg>`;
+    }
+
+    function renderRollingXslg(player) {
+      const rows = player.rolling_xslg || [];
+      if (rows.length < 2) {
+        const message = bbeCount(player) >= 5
+          ? "Rolling xSLG needs contact-level xSLG estimates for this player."
+          : "Rolling xSLG needs at least five tracked batted balls.";
+        return `<div class="chart-empty">${message}</div>`;
+      }
+      const w = 560, h = 270, l = 54, r = 20, t = 18, b = 38;
+      const ys = rows.map(d => Number(d.y)).filter(Number.isFinite);
+      const minY = Math.max(0, Math.min(.150, Math.min(...ys) - .04));
+      const maxY = Math.min(1.25, Math.max(.650, Math.max(...ys) + .04));
+      const xScale = i => l + (i / Math.max(1, rows.length - 1)) * (w - l - r);
+      const yScale = v => t + (maxY - v) / (maxY - minY || 1) * (h - t - b);
+      const path = rows.map((d,i) => `${i ? "L" : "M"} ${xScale(i).toFixed(1)} ${yScale(Number(d.y)).toFixed(1)}`).join(" ");
+      const ticks = [maxY, (maxY+minY)/2, minY];
+      const tickSvg = ticks.map(v => `<g><line x1="${l}" y1="${yScale(v)}" x2="${w-r}" y2="${yScale(v)}" stroke="#aaa" stroke-dasharray="5 6"/><text x="${l-8}" y="${yScale(v)+4}" text-anchor="end" font-size="12" fill="#555">${v.toFixed(3).replace(/^0\./,'.')}</text></g>`).join("");
+      return `<svg class="rolling-svg" viewBox="0 0 ${w} ${h}" aria-label="100 BBE rolling xSLG">
+        ${tickSvg}
+        <line x1="${l}" y1="${t}" x2="${l}" y2="${h-b}" stroke="#222" stroke-width="2"/>
+        <line x1="${l}" y1="${h-b}" x2="${w-r}" y2="${h-b}" stroke="#222" stroke-width="2"/>
+        <path d="${path}" fill="none" stroke="#f21f26" stroke-width="4" stroke-linejoin="round" stroke-linecap="round"/>
+        <text x="${w-r}" y="${h-b+24}" text-anchor="end" font-size="12" fill="#666">latest ${rows[rows.length-1].y.toFixed(3).replace(/^0\./,'.')}</text>
+      </svg>`;
+    }
+
+    function drsComponentRows(player) {
+      const pos = String(player.synergy_pos || player.position || "").toUpperCase();
+      const posTokens = pos.split(/[^A-Z0-9]+/).filter(Boolean);
+      let rows;
+      if (posTokens.includes("C")) {
+        rows = [
+          ["Framing", "framing_runs_saved"],
+          ["Throwing", "throwing_runs"],
+          ["Blocking", "blocking_runs"],
+          ["Stolen Base", "stolen_base_runs"],
+          ["Pickoff", "pickoff_runs"],
+        ];
+      } else if (["1B","2B","3B","SS","INF"].some(p => posTokens.includes(p))) {
+        rows = [
+          ["Infield GB", "infield_gb_runs"],
+          ["DP Start", "double_play_runs_start"],
+          ["DP Pivot", "double_play_runs_pivot"],
+          ["Infield FB", "infield_fb_runs"],
+          ["Bunt", "bunt_runs"],
+        ];
+      } else if (["LF","CF","RF","OF"].some(p => posTokens.includes(p))) {
+        rows = [
+          ["Outfield Range", "outfield_fb_runs"],
+          ["Outfield Arm", "outfield_arm_runs"],
+        ];
+      } else {
+        rows = [
+          ["Infield GB", "infield_gb_runs"],
+          ["Outfield Range", "outfield_fb_runs"],
+          ["Outfield Arm", "outfield_arm_runs"],
+          ["Framing", "framing_runs_saved"],
+          ["Blocking", "blocking_runs"],
+        ];
+      }
+      return rows
+        .map(([label, key]) => [label, key, player[key]])
+        .filter(([, , value]) => value !== null && value !== undefined && !Number.isNaN(Number(value)));
+    }
+
+    function fieldingMetric(label, value, key, display) {
+      const c = fieldingStyle(value, key);
+      const pct = c.pct === null ? "" : `<small class="fielding-pct">${ordinal(c.pct)} pct</small>`;
+      return `<div class="fielding-metric" style="${c.style}"><span>${esc(label)}</span><strong>${esc(display)}</strong>${pct}</div>`;
+    }
+
+    function fieldingValue(label, value, key, display) {
+      const c = fieldingStyle(value, key);
+      const pct = c.pct === null ? "" : `<small>${ordinal(c.pct)} pct</small>`;
+      return `<div class="fielding-row"><span>${esc(label)}</span><span class="fielding-value" style="${c.style}">${esc(display)}${pct}</span></div>`;
+    }
+
+    function fieldingPanel(player) {
+      const componentRows = drsComponentRows(player);
+      const fieldingRows = [
+        ["PO", player.fld_po, null, plainNum(player.fld_po, 0)],
+        ["A", player.fld_a, null, plainNum(player.fld_a, 0)],
+        ["E", player.fld_e, "fld_e", plainNum(player.fld_e, 0)],
+        ["Fld%", player.fld_pct, "fld_pct", fieldPctText(player.fld_pct)],
+        ["DP", player.fld_idp, null, plainNum(player.fld_idp, 0)],
+        ["PB", player.fld_pb, null, plainNum(player.fld_pb, 0)],
+      ].filter(([, value]) => value !== null && value !== undefined && !Number.isNaN(Number(value)));
+      const rowsHtml = componentRows.length
+        ? componentRows.map(([label, key, value]) => fieldingValue(label, value, key, signedText(value))).join("")
+        : `<div class="fielding-row"><span>DRS components</span><span>--</span></div>`;
+      const fieldingHtml = fieldingRows.length
+        ? fieldingRows.map(([label, value, key, display]) => fieldingValue(label, value, key, display)).join("")
+        : `<div class="fielding-row"><span>D1 fielding line</span><span>--</span></div>`;
+      return `<div class="fielding-box">
+        <div class="chart-title">Fielding</div>
+        <div class="dot-rule">.....</div>
+        <div class="fielding-summary">
+          ${fieldingMetric("WAR", player.war, "war", signedText(player.war))}
+          ${fieldingMetric("WAR/55", player.war_per_55, "war_per_55", statText(player.war_per_55, 4))}
+          ${fieldingMetric("DRS", player.drs, "drs", signedText(player.drs))}
+          <div class="fielding-metric"><span>DRS Pos</span><strong>${esc(player.synergy_pos || player.position || "--")}</strong></div>
+        </div>
+        <div class="fielding-components">
+          ${rowsHtml}
+          ${fieldingHtml}
+        </div>
+        <div class="fielding-source">DRS components use the D1Baseball/Synergy position buckets; PO/A/E/Fld% come from the D1 fielding line.</div>
+      </div>`;
+    }
+
+    function chartPanel(player) {
+      return `<section class="player-sheet-panel chart-panel">
+        ${fieldingPanel(player)}
+        <div class="chart-box">
+          <div class="chart-title">2026 Hits Spray Chart</div>
+          <div class="dot-rule">.....</div>
+          ${renderSprayChart(player)}
+        </div>
+        <div class="chart-box">
+          <div class="chart-title">100 BBE Rolling xSLG</div>
+          <div class="dot-rule">.....</div>
+          ${renderRollingXslg(player)}
+        </div>
+      </section>`;
+    }
+
+    function openModal(player) {
+      document.getElementById("modalName").textContent = player.name;
+      document.getElementById("modalMeta").textContent =
+        `${player.position} · ${player.status} · ${player.pa} PA · Bats: ${player.bats||'--'}`;
+      document.getElementById("modalBody").innerHTML = `<div class="player-sheet-grid">
+        ${bioPanel(player)}
+        ${percentilePanel(player)}
+        ${chartPanel(player)}
+      </div>`;
+      const modalBody = document.getElementById("modalBody");
+      modalBody.querySelectorAll("[data-percentile-mode]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const showTeamStats = btn.dataset.percentileMode === "team-stats";
+          modalBody.querySelector(".player-percentile-view").hidden = showTeamStats;
+          modalBody.querySelector(".player-d1-view").hidden = !showTeamStats;
+          modalBody.querySelectorAll("[data-percentile-mode]").forEach(b => b.classList.toggle("active", b === btn));
+        });
+      });
+
+      overlay.classList.add("open");
+      panel.classList.add("open");
+    }
+
+    function closeModal() {
+      overlay.classList.remove("open");
+      panel.classList.remove("open");
+    }
+
+    overlay.addEventListener("click", closeModal);
+    modalClose.addEventListener("click", closeModal);
+    document.addEventListener("keydown", e => { if (e.key === "Escape") closeModal(); });
+
+    // ── Table ──
+    let sortKey = "ops", sortDir = -1;
+    function valueFor(row, key) {
+      const v = row[key];
+      if (v === null || v === undefined) return (key==="name"||key==="position") ? "" : -9999;
+      return v;
+    }
+    function render() {
+      const query = document.getElementById("search").value.toLowerCase();
+      const pos   = document.getElementById("position").value;
+      let rows = DATA.players.filter(r => r.name.toLowerCase().includes(query));
+      if (pos !== "all") rows = rows.filter(r => r.position.includes(pos));
+      rows.sort((a,b) => {
+        const av = valueFor(a,sortKey), bv = valueFor(b,sortKey);
+        if (typeof av === "string") return av.localeCompare(bv)*sortDir;
+        return (av-bv)*sortDir;
+      });
+      document.getElementById("players").innerHTML = rows.map(r => `
+        <tr>
+          <td>
+            <div class="player-name" data-name="${r.name}">${r.name}</div>
+            <div class="player-status">${r.status}</div>
+          </td>
+          <td>${r.position}</td>
+          <td>${r.pa}</td>
+          <td>${cc(r.avg,           'avg',            r.avgDisplay)}</td>
+          <td>${cc(r.obp,           'obp',            r.obpDisplay)}</td>
+          <td>${cc(r.slg,           'slg',            r.slgDisplay)}</td>
+          <td>${cc(r.ops,           'ops',            r.opsDisplay)}</td>
+          <td>${cc(r.woba,          'woba',           r.wobaDisplay)}</td>
+          <td>${cc(r.wrc_plus_proxy,'wrc_plus_proxy', r.wrcPlusDisplay)}</td>
+          <td>${cc(r.ops_plus,     'wrc_plus_proxy', r.opsPlusDisplay)}</td>
+          <td>${cc(r.iso,           'iso',            r.isoDisplay)}</td>
+          <td>${cc(r.walk_rate,     'walk_rate',      r.walkRateDisplay)}</td>
+          <td>${cc(r.k_rate,        'k_rate',         r.kRateDisplay)}</td>
+          <td>${cc(r.contact_rate,  'contact_rate',   r.contactRateDisplay)}</td>
+          <td>${cc(r.chase_rate,    'chase_rate',     r.chaseRateDisplay)}</td>
+          <td>${cc(r.hard_hit_pct,  'hard_hit_pct',   r.hardHitDisplay)}</td>
+          <td>${cc(r.avg_ev,        'avg_ev',         r.avgEvDisplay)}</td>
+          <td>${r.sb}</td>
+          <td>${r.war !== null && r.war !== undefined ? r.war.toFixed(2) : '--'}</td>
+          <td>${r.war_per_55 !== null && r.war_per_55 !== undefined ? r.war_per_55.toFixed(4) : '--'}</td>
+          <td>${r.drs !== null && r.drs !== undefined ? r.drs.toFixed(2) : '--'}</td>
+        </tr>`).join("");
+
+      document.querySelectorAll(".player-name").forEach(el => {
+        el.addEventListener("click", () => {
+          const player = DATA.players.find(p => p.name === el.dataset.name);
+          if (player) openModal(player);
+        });
+      });
+    }
+
+    document.querySelectorAll("th[data-key]").forEach(th => th.addEventListener("click", () => {
+      const key = th.dataset.key;
+      document.querySelectorAll("th").forEach(t => t.classList.remove("sorted"));
+      if (sortKey === key) sortDir *= -1;
+      else { sortKey = key; sortDir = (key==="name"||key==="position") ? 1 : -1; }
+      th.classList.add("sorted");
+      render();
+    }));
+    document.getElementById("search").addEventListener("input", render);
+    document.getElementById("position").addEventListener("change", render);
+    render();
+  </script>
+</body>
+</html>
