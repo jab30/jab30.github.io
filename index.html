@@ -910,7 +910,7 @@
         ["SLG", player.slg, "slg", player.slgDisplay],
         ["OPS", player.ops, "ops", player.opsDisplay],
         ["ISO", player.iso, "iso", player.isoDisplay],
-        ["BB/K", player.bb_k, "bb_k", numText(player.bb_k, 2)],
+        ["K:BB", player.bb_k > 0 ? 1/player.bb_k : null, "bb_k", player.bb_k > 0 ? (1/player.bb_k).toFixed(2) : "--"],
         ["Chase %", player.chase_rate, "chase_rate", pctText(player.chase_rate)],
         ["Whiff %", player.whiff_rate, "whiff_rate", pctText(player.whiff_rate)],
         ["Zone Contact %", player.zone_contact_rate, "zone_contact_rate", pctText(player.zone_contact_rate)],
