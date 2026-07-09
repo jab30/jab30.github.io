@@ -447,8 +447,7 @@
                 <th data-key="wrc_plus_proxy">wRC+</th>
                 <th data-key="ops_plus">OPS+</th>
                 <th data-key="iso">ISO</th>
-                <th data-key="walk_rate">BB%</th>
-                <th data-key="k_rate">K%</th>
+                <th data-key="bb_k">K:BB</th>
                 <th data-key="contact_rate">Con%</th>
                 <th data-key="chase_rate">Chase%</th>
                 <th data-key="hard_hit_pct">HH%</th>
@@ -1169,8 +1168,7 @@
           <td>${cc(r.wrc_plus_proxy,'wrc_plus_proxy', r.wrcPlusDisplay)}</td>
           <td>${cc(r.ops_plus,     'wrc_plus_proxy', r.opsPlusDisplay)}</td>
           <td>${cc(r.iso,           'iso',            r.isoDisplay)}</td>
-          <td>${cc(r.walk_rate,     'walk_rate',      r.walkRateDisplay)}</td>
-          <td>${cc(r.k_rate,        'k_rate',         r.kRateDisplay)}</td>
+          <td>${cc(r.bb_k, 'bb_k', r.bb_k > 0 ? (1/r.bb_k).toFixed(2) : '--')}</td>
           <td>${cc(r.contact_rate,  'contact_rate',   r.contactRateDisplay)}</td>
           <td>${cc(r.chase_rate,    'chase_rate',     r.chaseRateDisplay)}</td>
           <td>${cc(r.hard_hit_pct,  'hard_hit_pct',   r.hardHitDisplay)}</td>
