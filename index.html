@@ -1244,20 +1244,58 @@
       return Number.isFinite(n) ? n / 100 : null;
     }
 
+    function fraction(numerator, denominator) {
+      return denominator > 0 ? numerator / denominator : null;
+    }
+
+    function trackmanBattedBallFields(player) {
+      const spray = Array.isArray(player?.spray_points) ? player.spray_points : [];
+      const zone = Array.isArray(player?.zone_points) ? player.zone_points : [];
+      const evRows = spray.map(point => Number(point.exit_velocity)).filter(Number.isFinite);
+      const launchRows = spray.map(point => Number(point.launch_angle)).filter(Number.isFinite);
+      const bipRows = zone.filter(point => point?.bip);
+      const typedBipRows = bipRows.filter(point => point?.bb_type);
+      const countType = type => typedBipRows.filter(point => point.bb_type === type).length;
+      const swingRows = zone.filter(point => point?.swing);
+      const zoneSwingRows = zone.filter(point => point?.in_zone && point?.swing);
+      return {
+        hard_hit_pct: fraction(evRows.filter(value => value >= 95).length, evRows.length),
+        barrel_pct: fraction(bipRows.filter(point => point?.barrel).length, bipRows.length),
+        ld_pct: fraction(countType("LD"), typedBipRows.length),
+        gb_pct: fraction(countType("GB"), typedBipRows.length),
+        fb_pct: fraction(countType("FB"), typedBipRows.length),
+        sweet_spot: fraction(launchRows.filter(value => value >= 8 && value <= 32).length, launchRows.length),
+        contact_rate: fraction(swingRows.filter(point => point?.contact).length, swingRows.length),
+        whiff_rate: fraction(swingRows.filter(point => point?.miss).length, swingRows.length),
+        zone_contact_rate: fraction(zoneSwingRows.filter(point => point?.contact).length, zoneSwingRows.length),
+      };
+    }
+
     function normalizeFetchedPlayer(player) {
       const p = { ...player };
       const card = p.card || {};
+      const trackman = trackmanBattedBallFields(p);
       p.pa = p.pa ?? "--";
       p.trackman_team = p.trackman_team ?? p.source_team;
       p.trackman_bbe = p.trackman_bbe ?? (Array.isArray(p.spray_points) ? p.spray_points.length : undefined);
       p.avg_ev = p.avg_ev ?? firstNumber(p.ev_avg, cardValue(card, "avg_ev"));
       p.ev90 = p.ev90 ?? firstNumber(p.ev_90th, cardValue(card, "p90_ev"));
       p.chase_rate = p.chase_rate ?? pctValue(firstNumber(p.all_chase, cardValue(card, "chase_pct")));
+      ["hard_hit_pct","barrel_pct","ld_pct","gb_pct","fb_pct","sweet_spot","contact_rate","whiff_rate","zone_contact_rate"].forEach(key => {
+        if (trackman[key] !== null && trackman[key] !== undefined) p[key] = trackman[key];
+      });
       p.contact_rate = p.contact_rate ?? pctValue(p.all_contact);
       p.whiff_rate = p.whiff_rate ?? pctValue(firstNumber(cardValue(card, "whiff_pct"), p.iz_whiff_pct));
+      p.zone_contact_rate = p.zone_contact_rate ?? pctValue(p.zone_contact_pct);
       p.chaseRateDisplay = p.chaseRateDisplay ?? pctText(p.chase_rate);
-      p.contactRateDisplay = p.contactRateDisplay ?? pctText(p.contact_rate);
-      p.whiffRateDisplay = p.whiffRateDisplay ?? pctText(p.whiff_rate);
+      p.contactRateDisplay = pctText(p.contact_rate);
+      p.whiffRateDisplay = pctText(p.whiff_rate);
+      p.hardHitDisplay = pctText(p.hard_hit_pct);
+      p.barrelDisplay = pctText(p.barrel_pct);
+      p.ldDisplay = pctText(p.ld_pct);
+      p.gbDisplay = pctText(p.gb_pct);
+      p.fbDisplay = pctText(p.fb_pct);
+      p.sweetDisplay = pctText(p.sweet_spot);
       return p;
     }
 
@@ -1269,7 +1307,7 @@
       return merged;
     }
 
-    fetch("api/hitters?v=20260731-chris-daniels-advanced")
+    fetch("api/hitters?v=20260731-trackman-batted-ball")
       .then(r => r.ok ? r.json() : Promise.reject(new Error(`${r.status} ${r.statusText}`)))
       .then(payload => {
         const existingPlayers = new Map(DATA.players.map(player => [player.name, player]));
