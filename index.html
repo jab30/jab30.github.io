@@ -97,6 +97,23 @@
     }
     .player-name:hover { color:var(--purple-2); border-color:var(--purple-2); }
     .player-status { color:var(--muted); font-size:11.5px; margin-top:1px; }
+    .player-cell { display:flex; align-items:center; gap:10px; min-width:220px; }
+    .roster-shot {
+      width:38px; height:38px; border-radius:6px; object-fit:cover; flex-shrink:0;
+      background:var(--soft); border:1px solid rgba(82,35,152,.18);
+    }
+    .roster-shot-fallback {
+      display:grid; place-items:center; color:var(--purple); font-size:10px; font-weight:860;
+    }
+    .metric-pill {
+      display:inline-flex; flex-direction:column; align-items:center; min-width:44px;
+      border-radius:5px; padding:2px 7px; text-align:center; font-weight:700; line-height:1.25;
+    }
+    .pill-pct {
+      display:block; width:100%; margin-top:2px; padding-top:2px;
+      border-top:1px solid rgba(0,0,0,.18); font-size:9px; line-height:1; opacity:.75;
+    }
+    .pill-na { background:var(--soft); color:#9a8ab8; font-weight:600; }
 
     /* ── Cell color coding: purple → white → gold ── */
     .c-elite { background:var(--gold); color:#fff; font-weight:700; border-radius:4px; padding:1px 5px; }
@@ -428,7 +445,7 @@
           </div>
         </div>
         <p style="font-size:11.5px;color:var(--muted);margin-bottom:10px;">
-          Click any column header to sort &bull; Click a player name for full Trackman detail
+          Loaded from Hitting App build b2b194fb &bull; Click any column header to sort
           &bull; <span style="background:var(--gold);color:#fff;border-radius:3px;padding:0 5px;font-weight:700;">gold</span> = elite &bull;
           <span style="background:var(--purple);color:#fff;border-radius:3px;padding:0 5px;font-weight:700;">purple</span> = poor — vs D1 qualified hitters
         </p>
@@ -438,24 +455,19 @@
               <tr>
                 <th data-key="name">Player</th>
                 <th data-key="position">Pos</th>
-                <th data-key="pa">PA</th>
-                <th data-key="avg">AVG</th>
-                <th data-key="obp">OBP</th>
-                <th data-key="slg">SLG</th>
-                <th data-key="ops">OPS</th>
-                <th data-key="woba">wOBA</th>
-                <th data-key="wrc_plus_proxy">wRC+</th>
-                <th data-key="ops_plus">OPS+</th>
-                <th data-key="iso">ISO</th>
-                <th data-key="bb_k">K:BB</th>
-                <th data-key="contact_rate">Con%</th>
-                <th data-key="chase_rate">Chase%</th>
-                <th data-key="hard_hit_pct">HH%</th>
-                <th data-key="avg_ev">Avg EV</th>
-                <th data-key="sb">SB</th>
-                <th data-key="war">WAR</th>
-                <th data-key="war_per_55">WAR/55</th>
-                <th data-key="drs">DRS</th>
+                <th data-key="bats">Bats</th>
+                <th data-key="status">Status</th>
+                <th data-key="pitches">Pitches</th>
+                <th data-key="lopes_plus">Lopes+</th>
+                <th data-key="contact_quality_plus">Contact Quality+</th>
+                <th data-key="bat_to_ball_plus">Bat to Ball+</th>
+                <th data-key="swing_decisions_plus">Swing Decisions+</th>
+                <th data-key="lopes_forge_plus">Forge+</th>
+                <th data-key="ev_avg">Avg EV</th>
+                <th data-key="ev_90th">90th EV</th>
+                <th data-key="all_chase">Chase%</th>
+                <th data-key="all_contact">Contact%</th>
+                <th data-key="iz_whiff_pct">IZ Whiff%</th>
               </tr>
             </thead>
             <tbody id="players"></tbody>
@@ -1135,16 +1147,34 @@
     document.addEventListener("keydown", e => { if (e.key === "Escape") closeModal(); });
 
     // ── Table ──
-    let sortKey = "ops", sortDir = -1;
+    let sortKey = "lopes_plus", sortDir = -1;
     function valueFor(row, key) {
       const v = row[key];
-      if (v === null || v === undefined) return (key==="name"||key==="position") ? "" : -9999;
+      if (v === null || v === undefined) return (key==="name"||key==="position"||key==="bats"||key==="status") ? "" : -9999;
       return v;
+    }
+    function railwayPercentile(player, key) {
+      const scopes = player?.leaderboard_percentiles || {};
+      const cardScopes = player?.player_card_percentiles || {};
+      const qualifier = String(player?.pitches || 1);
+      const byScope = scopes.d1 || scopes.every_level || {};
+      const byCardScope = cardScopes.d1 || cardScopes.every_level || {};
+      const mappedKey = key === "ev_avg" ? "avg_ev" : key === "ev_90th" ? "p90_ev" : key;
+      return byScope[qualifier]?.[key] ?? byScope["1"]?.[key] ?? byCardScope[qualifier]?.[mappedKey] ?? byCardScope["1"]?.[mappedKey] ?? null;
+    }
+    function plusCell(player, key, digits = 1) {
+      const value = player?.[key];
+      if (value === null || value === undefined || value === "") return `<span class="metric-pill pill-na">--</span>`;
+      const pct = railwayPercentile(player, key);
+      if (pct === null || pct === undefined || Number.isNaN(Number(pct))) return `<span class="metric-pill pill-na">${Number(value).toFixed(digits)}</span>`;
+      const color = barColor(pct);
+      const textColor = textColorForBg(color);
+      return `<span class="metric-pill" style="background:${color};color:${textColor}">${Number(value).toFixed(digits)}<span class="pill-pct">${Math.round(pct)}</span></span>`;
     }
     function render() {
       const query = document.getElementById("search").value.toLowerCase();
       const pos   = document.getElementById("position").value;
-      let rows = DATA.players.filter(r => r.name.toLowerCase().includes(query));
+      let rows = DATA.players.filter(r => `${r.name || ""} ${r.csv || ""} ${r.source_team || ""}`.toLowerCase().includes(query));
       if (pos !== "all") rows = rows.filter(r => r.position.includes(pos));
       rows.sort((a,b) => {
         const av = valueFor(a,sortKey), bv = valueFor(b,sortKey);
@@ -1154,28 +1184,28 @@
       document.getElementById("players").innerHTML = rows.map(r => `
         <tr>
           <td>
-            <div class="player-name" data-name="${r.name}">${r.name}</div>
-            <div class="player-status">${r.status}</div>
+            <div class="player-cell">
+              ${r.headshot ? `<img class="roster-shot" src="${esc(r.headshot)}" alt="${esc(r.name)}">` : `<span class="roster-shot roster-shot-fallback">${esc(r.position || "H")}</span>`}
+              <div>
+                <div class="player-name" data-name="${esc(r.name)}">${esc(r.name)}</div>
+                <div class="player-status">${esc(r.csv || "")}</div>
+              </div>
+            </div>
           </td>
-          <td>${r.position}</td>
-          <td>${r.pa}</td>
-          <td>${cc(r.avg,           'avg',            r.avgDisplay)}</td>
-          <td>${cc(r.obp,           'obp',            r.obpDisplay)}</td>
-          <td>${cc(r.slg,           'slg',            r.slgDisplay)}</td>
-          <td>${cc(r.ops,           'ops',            r.opsDisplay)}</td>
-          <td>${cc(r.woba,          'woba',           r.wobaDisplay)}</td>
-          <td>${cc(r.wrc_plus_proxy,'wrc_plus_proxy', r.wrcPlusDisplay)}</td>
-          <td>${cc(r.ops_plus,     'wrc_plus_proxy', r.opsPlusDisplay)}</td>
-          <td>${cc(r.iso,           'iso',            r.isoDisplay)}</td>
-          <td>${cc(r.bb_k, 'bb_k', r.bb_k > 0 ? (1/r.bb_k).toFixed(2) : '--')}</td>
-          <td>${cc(r.contact_rate,  'contact_rate',   r.contactRateDisplay)}</td>
-          <td>${cc(r.chase_rate,    'chase_rate',     r.chaseRateDisplay)}</td>
-          <td>${cc(r.hard_hit_pct,  'hard_hit_pct',   r.hardHitDisplay)}</td>
-          <td>${cc(r.avg_ev,        'avg_ev',         r.avgEvDisplay)}</td>
-          <td>${r.sb}</td>
-          <td>${r.war !== null && r.war !== undefined ? r.war.toFixed(2) : '--'}</td>
-          <td>${r.war_per_55 !== null && r.war_per_55 !== undefined ? r.war_per_55.toFixed(4) : '--'}</td>
-          <td>${r.drs !== null && r.drs !== undefined ? r.drs.toFixed(2) : '--'}</td>
+          <td>${esc(r.position || "--")}</td>
+          <td>${esc(r.bats || "--")}</td>
+          <td>${esc(r.status || r.source_team || "--")}</td>
+          <td>${Number(r.pitches || 0).toLocaleString()}</td>
+          <td>${plusCell(r, "lopes_plus")}</td>
+          <td>${plusCell(r, "contact_quality_plus")}</td>
+          <td>${plusCell(r, "bat_to_ball_plus")}</td>
+          <td>${plusCell(r, "swing_decisions_plus")}</td>
+          <td>${plusCell(r, "lopes_forge_plus")}</td>
+          <td>${plusCell(r, "ev_avg")}</td>
+          <td>${plusCell(r, "ev_90th")}</td>
+          <td>${plusCell(r, "all_chase")}</td>
+          <td>${plusCell(r, "all_contact")}</td>
+          <td>${plusCell(r, "iz_whiff_pct")}</td>
         </tr>`).join("");
 
       document.querySelectorAll(".player-name").forEach(el => {
@@ -1190,13 +1220,23 @@
       const key = th.dataset.key;
       document.querySelectorAll("th").forEach(t => t.classList.remove("sorted"));
       if (sortKey === key) sortDir *= -1;
-      else { sortKey = key; sortDir = (key==="name"||key==="position") ? 1 : -1; }
+      else { sortKey = key; sortDir = (key==="name"||key==="position"||key==="bats"||key==="status") ? 1 : -1; }
       th.classList.add("sorted");
       render();
     }));
     document.getElementById("search").addEventListener("input", render);
     document.getElementById("position").addEventListener("change", render);
-    render();
+    fetch("api/hitters?v=b2b194fb")
+      .then(r => r.ok ? r.json() : Promise.reject(new Error(`${r.status} ${r.statusText}`)))
+      .then(payload => {
+        DATA.players = payload.players || DATA.players;
+        DATA.team.roster_players = DATA.players.length;
+        render();
+      })
+      .catch(err => {
+        console.error("Could not load Railway hitting roster", err);
+        render();
+      });
   </script>
 </body>
 </html>
