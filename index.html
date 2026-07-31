@@ -951,40 +951,49 @@
       </section>`;
     }
 
-    const sprayColors = { HomeRun:"#d92b75", Triple:"#f0b429", Double:"#7156d9", Single:"#ff6a00", Out:"#8f8f8f" };
-    const sprayLabels = { HomeRun:"HOME RUN", Triple:"TRIPLE", Double:"DOUBLE", Single:"SINGLE", Out:"OUT" };
-    function fieldPoint(point) {
-      return `${280 + Number(point.x || 0) * 0.8},${40 + Number(point.y || 0) * 0.8}`;
-    }
+    const sprayColors = { HR:"#d3a51d", HomeRun:"#d3a51d", XBH:"#7b3dc4", Triple:"#7b3dc4", Double:"#7b3dc4", "1B":"#299c79", Single:"#299c79", Out:"#9893a4" };
+    const sprayLegend = [["HR","#d3a51d"], ["XBH","#7b3dc4"], ["1B","#299c79"], ["Out","#9893a4"]];
+    const GCU_FIELD = {
+      fence: [{ x: -226.1, y: 229.1 }, { x: -71, y: 388.9 }, { x: 102.8, y: 372.2 }, { x: 233.6, y: 235.7 }],
+      foul: [{ x: 234.4, y: 236.9 }, { x: 246.9, y: 213.2 }, { x: 109.7, y: 78.5 }, { x: 92, y: 22.8 }, { x: 21.7, y: -41.2 }, { x: -29.9, y: -41.2 }, { x: -96.8, y: 27.9 }, { x: -107.3, y: 72.5 }, { x: -130.4, y: 99.7 }, { x: -161, y: 143.5 }, { x: -233.6, y: 220.4 }, { x: -226.5, y: 229 }],
+    };
+    const fieldPoint = ({ x, y }) => ({ x: 280 + Number(x || 0) * 0.8, y: 420 - (40 + Number(y || 0) * 0.8) });
+    const screenPoint = ({ x, y }) => ({ x: Number(x || 0), y: 420 - Number(y || 0) });
+    const svgPath = (points) => points.map((p, i) => `${i ? "L" : "M"} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(" ") + " Z";
+    const svgLinePath = (points) => points.map((p, i) => `${i ? "L" : "M"} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(" ");
     function polarPoint(angleDeg, distanceFt) {
       const a = angleDeg * Math.PI / 180;
-      return `${280 + Math.sin(a) * distanceFt * 0.8},${40 + Math.cos(a) * distanceFt * 0.8}`;
+      return fieldPoint({ x: Math.sin(a) * distanceFt, y: Math.cos(a) * distanceFt });
+    }
+    function sprayField() {
+      const home = fieldPoint({ x: 0, y: 0 });
+      const fence = GCU_FIELD.fence.map(fieldPoint);
+      const foul = GCU_FIELD.foul.map(fieldPoint);
+      const leftLine = polarPoint(-45, 320);
+      const rightLine = polarPoint(45, 332);
+      const dirtArc = Array.from({ length: 86 }, (_, i) => polarPoint(-50 + (100 * i) / 85, 165));
+      const first = polarPoint(45, 90);
+      const second = polarPoint(0, 127.28);
+      const third = polarPoint(-45, 90);
+      const mound = polarPoint(0, 60.5);
+      const outer = [foul[5], ...foul.slice(6, 10), fence[0], ...fence.slice(1), foul[2], foul[3], foul[4]];
+      const fair = [home, fence[0], ...fence.slice(1), home];
+      const dirt = [home, ...dirtArc];
+      const bases = [first, second, third].map((base) => `<rect x="${base.x - 5}" y="${base.y - 5}" width="10" height="10" fill="#fff" transform="rotate(45 ${base.x} ${base.y})"/>`).join("");
+      return `<path d="${svgPath(outer)}" fill="#dfc06a"/><path d="${svgPath(fair)}" fill="#287f37"/><path d="${svgPath([home, leftLine, ...fence, rightLine])}" fill="#287f37"/><path d="${svgLinePath(fence)}" fill="none" stroke="#a98710" stroke-width="18" stroke-linejoin="round"/><path d="${svgLinePath(fence)}" fill="none" stroke="#11672a" stroke-width="5" stroke-linejoin="round"/><path d="${svgPath(dirt)}" fill="#b68638"/><path d="${svgPath([home, first, second, third])}" fill="#287f37"/><path d="M ${home.x} ${home.y} L ${fence[0].x} ${fence[0].y} M ${home.x} ${home.y} L ${fence.at(-1).x} ${fence.at(-1).y}" stroke="#fff" stroke-width="2.5"/><path d="M ${home.x} ${home.y} L ${first.x} ${first.y} M ${home.x} ${home.y} L ${third.x} ${third.y}" stroke="#fff" stroke-width="1.8"/><circle cx="${mound.x}" cy="${mound.y}" r="9" fill="#b68638"/><circle cx="${home.x}" cy="${home.y}" r="16" fill="#b68638"/>${bases}<path d="M ${home.x - 7} ${home.y + 6} L ${home.x + 7} ${home.y + 6} L ${home.x + 7} ${home.y - 4} L ${home.x} ${home.y - 12} L ${home.x - 7} ${home.y - 4} Z" fill="#fff"/>`;
     }
     function renderSprayChart(player) {
       const points = player.spray_points || [];
       if (!points.length) return `<div class="chart-empty">No spray chart coordinates found for this player yet.</div>`;
-      const fence = [
-        {x:-226.1,y:229.1}, {x:-71.0,y:388.9}, {x:102.8,y:372.2}, {x:233.6,y:235.7}
-      ].map(fieldPoint).join(" ");
-      const infieldArc = Array.from({length:72}, (_, i) => polarPoint(-50 + (100*i/71), 165)).join(" ");
-      const dots = points.map(p => `<circle cx="${p.x}" cy="${p.y}" r="${p.category === 'HomeRun' ? 5.5 : 4.8}" fill="${sprayColors[p.category] || sprayColors.Out}" stroke="#222" stroke-width="1"><title>${esc(p.result)} | ${p.exit_velocity} mph | ${p.launch_angle} deg | ${p.distance} ft</title></circle>`).join("");
-      const legend = ["Single","Double","Triple","HomeRun"].map(k => `<span><i class="legend-dot" style="background:${sprayColors[k]}"></i>${sprayLabels[k]}</span>`).join("");
+      const dots = points.map((p, index) => {
+        const point = screenPoint(p);
+        const title = `${esc(p.result || p.category || "Batted ball")} | ${numText(p.exit_velocity, 1)} mph | ${numText(p.launch_angle, 1)} deg | ${numText(p.distance, 0)} ft`;
+        return `<circle cx="${point.x}" cy="${point.y}" r="5" fill="${sprayColors[p.category] || "#777"}" stroke="#fff" stroke-width="1" opacity=".9" data-index="${index}"><title>${title}</title></circle>`;
+      }).join("");
+      const legend = sprayLegend.map(([label, color]) => `<span><i class="legend-dot" style="background:${color}"></i>${label}</span>`).join("");
       return `<div class="spray-legend">${legend}</div>
         <svg class="spray-svg" viewBox="0 0 560 430" aria-label="Hits spray chart">
-          <g transform="rotate(180 280 215)">
-            <polygon points="280,40 ${fence} 280,40" fill="#b6e3df" opacity=".95" stroke="#e6e6e6" stroke-width="2"/>
-            <polyline points="${fence}" fill="none" stroke="#e4e4e4" stroke-width="8"/>
-            <line x1="280" y1="40" x2="99" y2="223" stroke="#e6e6e6" stroke-width="2"/>
-            <line x1="280" y1="40" x2="467" y2="229" stroke="#e6e6e6" stroke-width="2"/>
-            <polygon points="${polarPoint(45,90)} ${polarPoint(0,127.28)} ${polarPoint(-45,90)}" fill="#fff" opacity=".72"/>
-            <polyline points="${infieldArc}" fill="none" stroke="#fff" stroke-width="8" opacity=".75"/>
-            <circle cx="280" cy="88.4" r="8" fill="#fff"/>
-            <rect x="331" y="88" width="10" height="10" fill="#fff" transform="rotate(45 336 93)"/>
-            <rect x="275" y="137" width="10" height="10" fill="#fff" transform="rotate(45 280 142)"/>
-            <rect x="219" y="88" width="10" height="10" fill="#fff" transform="rotate(45 224 93)"/>
-            <path d="M273 38 L287 38 L287 48 L280 55 L273 48 Z" fill="#fff"/>
-            ${dots}
-          </g>
+          ${sprayField()}${dots}
         </svg>`;
     }
 
