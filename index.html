@@ -788,13 +788,15 @@
 
     function bbeCount(player) {
       const count = Number(player?.trackman_bbe);
-      return Number.isFinite(count) && count > 0 ? Math.round(count) : 0;
+      if (Number.isFinite(count) && count > 0) return Math.round(count);
+      const sprayCount = Number(player?.spray_points?.length || 0);
+      return Number.isFinite(sprayCount) && sprayCount > 0 ? sprayCount : 0;
     }
 
     function bbeText(player) {
       const count = bbeCount(player);
       if (count > 0) return `${count} BBE`;
-      const hasBattedBallMetrics = [player?.avg_ev, player?.ev90, player?.hard_hit_pct].some(v => v !== null && v !== undefined && !Number.isNaN(Number(v)));
+      const hasBattedBallMetrics = [player?.avg_ev, player?.ev_avg, player?.ev90, player?.ev_90th, player?.hard_hit_pct].some(v => v !== null && v !== undefined && !Number.isNaN(Number(v)));
       return hasBattedBallMetrics ? "BBE count unavailable" : "0 BBE";
     }
 
@@ -809,6 +811,21 @@
         <div class="percentile-track">
           <div class="percentile-fill" style="width:${noData ? 0 : pctVal}%;background:${color}"></div>
           ${noData ? "" : `<div class="percentile-badge" style="left:${pctVal}%;background:${color};color:${txtColor}">${pctVal}</div>`}
+        </div>
+        <div class="percentile-value">${esc(display ?? "--")}</div>
+      </div>`;
+    }
+    function railwayPercentileRow(label, player, key, display, rawValue = player?.[key]) {
+      const pct = railwayPercentile(player, key);
+      const pctVal = pct ?? 0;
+      const color = pct === null || pct === undefined ? "#d8d0ea" : barColor(pct);
+      const txtColor = textColorForBg(color);
+      const noData = display === "--" || display === null || display === undefined || rawValue === null || rawValue === undefined || Number.isNaN(Number(rawValue));
+      return `<div class="percentile-row">
+        <div class="percentile-label">${esc(label)}</div>
+        <div class="percentile-track">
+          <div class="percentile-fill" style="width:${noData ? 0 : pctVal}%;background:${color}"></div>
+          ${noData ? "" : `<div class="percentile-badge" style="left:${pctVal}%;background:${color};color:${txtColor}">${Math.round(pctVal)}</div>`}
         </div>
         <div class="percentile-value">${esc(display ?? "--")}</div>
       </div>`;
@@ -870,20 +887,20 @@
 
     function basicStats(player) {
       const rows = [
-        ["Batting Average (AVG)", player.avgDisplay],
-        ["On-Base Percentage (OBP)", player.obpDisplay],
-        ["Slugging Percentage (SLG)", player.slgDisplay],
-        ["OPS", player.opsDisplay],
-        ["Runs Scored", player.r ?? player.runs ?? "--"],
-        ["RBIs", player.rbi_proxy ?? player.rbi ?? "--"],
-        ["Extra-base hits", player.xbh ?? "--"],
-        ["Walks", player.bb ?? "--"],
-        ["Strikeouts", player.k ?? "--"],
+        ["Lopes+", numText(player.lopes_plus, 1)],
+        ["Contact Quality+", numText(player.contact_quality_plus, 1)],
+        ["Bat to Ball+", numText(player.bat_to_ball_plus, 1)],
+        ["Swing Decisions+", numText(player.swing_decisions_plus, 1)],
+        ["Lopes Forge+", numText(player.lopes_forge_plus, 1)],
+        ["xSLG Contact", statText(player.slg_con)],
+        ["Stuff-adjusted xSLGcon", statText(player.stuff_adjusted_xslgcon)],
+        ["Opponent Stuff+", numText(player.opponent_stuff_plus, 1)],
+        ["Pitches", Number(player.pitches || 0).toLocaleString()],
       ];
       return `<div class="basic-stats">
         ${rows.map(([label, value]) => `<div class="basic-stat-row"><span>${esc(label)}</span><span>${esc(value ?? "--")}</span></div>`).join("")}
       </div>
-      <div class="trackman-strip"><span>${esc(player.trackman_team || "--")}</span><span>${esc(bbeText(player))}</span><span>${numText(player.avg_ev,1," mph")} EV</span></div>`;
+      <div class="trackman-strip"><span>${esc(player.source_team || player.trackman_team || "--")}</span><span>${esc(bbeText(player))}</span><span>${numText(player.ev_avg ?? player.avg_ev,1," mph")} EV</span></div>`;
     }
 
     function bioPanel(player) {
@@ -903,7 +920,7 @@
         <div class="bio-name">${esc(player.name)}</div>
         <div class="bio-meta">
           ${esc(pos)} | Grand Canyon<br>
-          Bats: ${esc(bats)} | PA: ${esc(player.pa ?? "--")}<br>
+          Bats: ${esc(bats)} | Pitches: ${Number(player.pitches || 0).toLocaleString()}<br>
           ${esc(school)}
         </div>
         ${basicStats(player)}
@@ -912,42 +929,34 @@
 
     function percentilePanel(player) {
       const valueRows = [
-        ["wOBA", player.woba, "woba", player.wobaDisplay],
-        ["wRC+", player.wrc_plus_proxy, "wrc_plus_proxy", player.wrcPlusDisplay],
-        ["OPS+", player.ops_plus, "wrc_plus_proxy", player.opsPlusDisplay],
-      ].map(r => percentileRow(...r)).join("");
+        ["Lopes+", "lopes_plus"],
+        ["Contact Quality+", "contact_quality_plus"],
+        ["Bat to Ball+", "bat_to_ball_plus"],
+        ["Swing Decisions+", "swing_decisions_plus"],
+        ["Lopes Forge+", "lopes_forge_plus"],
+      ].map(([label, key]) => railwayPercentileRow(label, player, key, numText(player[key], 1))).join("");
       const battingRows = [
-        ["AVG", player.avg, "avg", player.avgDisplay],
-        ["OBP", player.obp, "obp", player.obpDisplay],
-        ["SLG", player.slg, "slg", player.slgDisplay],
-        ["OPS", player.ops, "ops", player.opsDisplay],
-        ["ISO", player.iso, "iso", player.isoDisplay],
-        ["K:BB", player.bb_k > 0 ? 1/player.bb_k : null, "bb_k", player.bb_k > 0 ? (1/player.bb_k).toFixed(2) : "--"],
-        ["Chase %", player.chase_rate, "chase_rate", pctText(player.chase_rate)],
-        ["Whiff %", player.whiff_rate, "whiff_rate", pctText(player.whiff_rate)],
-        ["Zone Contact %", player.zone_contact_rate, "zone_contact_rate", pctText(player.zone_contact_rate)],
-      ].map(r => percentileRow(...r)).join("");
+        ["Opponent Stuff+", "opponent_stuff_plus"],
+        ["Stuff-adjusted xSLGcon", "stuff_adjusted_xslgcon", statText(player.stuff_adjusted_xslgcon)],
+        ["xSLG Contact", "slg_con", statText(player.slg_con)],
+        ["Chase %", "all_chase", numText(player.all_chase, 1, "%")],
+        ["Contact %", "all_contact", numText(player.all_contact, 1, "%")],
+        ["IZ Whiff %", "iz_whiff_pct", numText(player.iz_whiff_pct, 1, "%")],
+      ].map(([label, key, display]) => railwayPercentileRow(label, player, key, display ?? numText(player[key], 1))).join("");
       const battedRows = [
-        ["xSLG Contact", player.slg_con, "slg", statText(player.slg_con)],
-        ["Avg Exit Velo", player.avg_ev, "avg_ev", numText(player.avg_ev, 1)],
-        ["90th Pct EV", player.ev90, "ev90", numText(player.ev90, 1)],
-        ["Hard-Hit %", player.hard_hit_pct, "hard_hit_pct", pctText(player.hard_hit_pct)],
-        ["Barrel %", player.barrel_pct, "barrel_pct", pctText(player.barrel_pct)],
-        ["Line Drive %", player.ld_pct, "ld_pct", pctText(player.ld_pct)],
-        ["LA SwSp%", player.sweet_spot, "sweet_spot", pctText(player.sweet_spot)],
-      ].map(r => percentileRow(...r)).join("");
+        ["Avg Exit Velo", "ev_avg", numText(player.ev_avg, 1)],
+        ["90th Pct EV", "ev_90th", numText(player.ev_90th, 1)],
+        ["Hard-Hit Air %", "hard_hit_air_pct", numText(player.hard_hit_air_pct, 1, "%")],
+        ["LA 10-30 %", "la_10_30_pct", numText(player.la_10_30_pct, 1, "%")],
+        ["Hard LA", "la_hard", numText(player.la_hard, 1)],
+      ].map(([label, key, display]) => railwayPercentileRow(label, player, key, display)).join("");
       return `<section class="player-sheet-panel">
         <div class="percentile-title">2026 D1 Percentile Rankings</div>
-        <div class="percentile-switch">
-          <button type="button" class="active" data-percentile-mode="percentiles">Percentiles</button>
-          <button type="button" data-percentile-mode="team-stats">Team Rank Stats</button>
-        </div>
         <div class="player-percentile-view">
           <div class="percentile-group-title">Value</div>${valueRows}
-          <div class="percentile-group-title">Batting</div>${battingRows}
+          <div class="percentile-group-title">Approach</div>${battingRows}
           <div class="percentile-group-title">Batted Ball</div>${battedRows}
         </div>
-        ${playerTeamRankingStats(player)}
       </section>`;
     }
 
@@ -1066,6 +1075,35 @@
     }
 
     function fieldingPanel(player) {
+      const hasFieldingData = ["war","war_per_55","drs","fld_po","fld_a","fld_e","fld_pct"].some((key) => player[key] !== null && player[key] !== undefined && !Number.isNaN(Number(player[key])));
+      if (!hasFieldingData) {
+        const card = player.card || {};
+        const cardRows = [
+          ["CQ+", card.cq_plus?.[0], card.cq_plus?.[1]],
+          ["Avg EV", card.avg_ev?.[0], card.avg_ev?.[1]],
+          ["90th EV", card.p90_ev?.[0], card.p90_ev?.[1]],
+          ["Whiff %", card.whiff_pct?.[0], card.whiff_pct?.[1]],
+          ["Chase %", card.chase_pct?.[0], card.chase_pct?.[1]],
+          ["BB %", card.bb_pct?.[0], card.bb_pct?.[1]],
+        ];
+        return `<div class="fielding-box">
+          <div class="chart-title">Hitting App Summary</div>
+          <div class="dot-rule">.....</div>
+          <div class="fielding-summary">
+            <div class="fielding-metric"><span>Lopes+</span><strong>${numText(player.lopes_plus, 1)}</strong></div>
+            <div class="fielding-metric"><span>Forge+</span><strong>${numText(player.lopes_forge_plus, 1)}</strong></div>
+            <div class="fielding-metric"><span>Spray BBE</span><strong>${Number(player.spray_points?.length || 0).toLocaleString()}</strong></div>
+            <div class="fielding-metric"><span>Zone Pitches</span><strong>${Number(player.zone_points?.length || 0).toLocaleString()}</strong></div>
+          </div>
+          <div class="fielding-components">
+            ${cardRows.filter(([, value]) => value !== null && value !== undefined && !Number.isNaN(Number(value))).map(([label, value, pct]) => {
+              const color = pct === null || pct === undefined ? "#ede8f8" : barColor(pct);
+              return `<div class="fielding-row"><span>${esc(label)}</span><span class="fielding-value" style="background:${color};color:${textColorForBg(color)}">${numText(value, 1)}${pct === null || pct === undefined ? "" : `<small>${Math.round(pct)} pct</small>`}</span></div>`;
+            }).join("")}
+          </div>
+          <div class="fielding-source">This player is loaded from the Railway Hitting App roster. Fielding lines are not part of that hitter payload.</div>
+        </div>`;
+      }
       const componentRows = drsComponentRows(player);
       const fieldingRows = [
         ["PO", player.fld_po, null, plainNum(player.fld_po, 0)],
@@ -1117,7 +1155,7 @@
     function openModal(player) {
       document.getElementById("modalName").textContent = player.name;
       document.getElementById("modalMeta").textContent =
-        `${player.position} · ${player.status} · ${player.pa} PA · Bats: ${player.bats||'--'}`;
+        `${player.position || "--"} · ${player.status || player.source_team || "Tracked"} · ${Number(player.pitches || 0).toLocaleString()} pitches · Bats: ${player.bats||'--'}`;
       document.getElementById("modalBody").innerHTML = `<div class="player-sheet-grid">
         ${bioPanel(player)}
         ${percentilePanel(player)}
