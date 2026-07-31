@@ -1261,10 +1261,21 @@
       return p;
     }
 
-    fetch("api/hitters?v=b2b194fb")
+    function mergeFetchedPlayer(existing, fetched) {
+      const merged = { ...(existing || {}) };
+      Object.entries(fetched || {}).forEach(([key, value]) => {
+        if (value !== null && value !== undefined && value !== "") merged[key] = value;
+      });
+      return merged;
+    }
+
+    fetch("api/hitters?v=20260731-d1-profiles")
       .then(r => r.ok ? r.json() : Promise.reject(new Error(`${r.status} ${r.statusText}`)))
       .then(payload => {
-        DATA.players = (payload.players || DATA.players).map(normalizeFetchedPlayer);
+        const existingPlayers = new Map(DATA.players.map(player => [player.name, player]));
+        DATA.players = (payload.players || DATA.players)
+          .map(player => mergeFetchedPlayer(existingPlayers.get(player.name), player))
+          .map(normalizeFetchedPlayer);
         DATA.team.roster_players = DATA.players.length;
         render();
       })
