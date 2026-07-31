@@ -1226,10 +1226,45 @@
     }));
     document.getElementById("search").addEventListener("input", render);
     document.getElementById("position").addEventListener("change", render);
+
+    function firstNumber(...values) {
+      for (const value of values) {
+        const n = Number(value);
+        if (value !== null && value !== undefined && Number.isFinite(n)) return n;
+      }
+      return null;
+    }
+
+    function cardValue(card, key) {
+      return Array.isArray(card?.[key]) ? card[key][0] : null;
+    }
+
+    function pctValue(value) {
+      const n = Number(value);
+      return Number.isFinite(n) ? n / 100 : null;
+    }
+
+    function normalizeFetchedPlayer(player) {
+      const p = { ...player };
+      const card = p.card || {};
+      p.pa = p.pa ?? "--";
+      p.trackman_team = p.trackman_team ?? p.source_team;
+      p.trackman_bbe = p.trackman_bbe ?? (Array.isArray(p.spray_points) ? p.spray_points.length : undefined);
+      p.avg_ev = p.avg_ev ?? firstNumber(p.ev_avg, cardValue(card, "avg_ev"));
+      p.ev90 = p.ev90 ?? firstNumber(p.ev_90th, cardValue(card, "p90_ev"));
+      p.chase_rate = p.chase_rate ?? pctValue(firstNumber(p.all_chase, cardValue(card, "chase_pct")));
+      p.contact_rate = p.contact_rate ?? pctValue(p.all_contact);
+      p.whiff_rate = p.whiff_rate ?? pctValue(firstNumber(cardValue(card, "whiff_pct"), p.iz_whiff_pct));
+      p.chaseRateDisplay = p.chaseRateDisplay ?? pctText(p.chase_rate);
+      p.contactRateDisplay = p.contactRateDisplay ?? pctText(p.contact_rate);
+      p.whiffRateDisplay = p.whiffRateDisplay ?? pctText(p.whiff_rate);
+      return p;
+    }
+
     fetch("api/hitters?v=b2b194fb")
       .then(r => r.ok ? r.json() : Promise.reject(new Error(`${r.status} ${r.statusText}`)))
       .then(payload => {
-        DATA.players = payload.players || DATA.players;
+        DATA.players = (payload.players || DATA.players).map(normalizeFetchedPlayer);
         DATA.team.roster_players = DATA.players.length;
         render();
       })
